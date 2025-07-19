@@ -9,11 +9,18 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    ```bash
    npm install
    ```
+   ```bash
+   bun install
+   ```
 
 2. Start the app
 
    ```bash
    npx expo start
+   ```
+
+    ```bash
+   bunx expo start
    ```
 
 In the output, you'll find options to open the app in a
