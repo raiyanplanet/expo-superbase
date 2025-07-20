@@ -14,15 +14,37 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) setError(error.message);
-    else router.replace("/dashboard/page");
+    setLoading(true);
+    console.log("=== LOGIN ATTEMPT ===");
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error("❌ Login error:", error);
+        setError(error.message);
+        return;
+      }
+
+      console.log("✅ Login successful:", data.user?.email);
+      console.log("📊 Session data:", !!data.session);
+
+      // Directly navigate to feed after successful login
+      console.log("🚀 Navigating to feed...");
+      router.replace("/(tabs)");
+    } catch (error) {
+      console.error("❌ Login exception:", error);
+      setError("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,7 +56,7 @@ export default function Login() {
         <Text className="text-gray-500">Sign in to continue</Text>
       </View>
 
-      <View className="space-y-4 ">
+      <View className="space-y-4">
         <TextInput
           className="mb-3 border border-b rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
           placeholder="Email"
@@ -42,6 +64,7 @@ export default function Login() {
           autoCapitalize="none"
           value={email}
           onChangeText={setEmail}
+          editable={!loading}
         />
 
         <TextInput
@@ -51,6 +74,7 @@ export default function Login() {
           secureTextEntry
           value={password}
           onChangeText={setPassword}
+          editable={!loading}
         />
 
         {error ? (
@@ -58,14 +82,18 @@ export default function Login() {
         ) : null}
 
         <TouchableOpacity
-          className="bg-gray-900 rounded-lg py-4 mt-8"
-          onPress={handleLogin}>
+          className={`rounded-lg py-4 mt-8 ${loading ? "bg-gray-400" : "bg-gray-900"}`}
+          onPress={handleLogin}
+          disabled={loading}>
           <Text className="text-white text-center text-lg font-medium">
-            Sign in
+            {loading ? "Signing in..." : "Sign in"}
           </Text>
         </TouchableOpacity>
 
-        <Pressable onPress={() => router.replace("/register")} className="mt-6">
+        <Pressable
+          onPress={() => router.replace("/register")}
+          className="mt-6"
+          disabled={loading}>
           <Text className="text-gray-600 text-center">
             Dont have an account?{" "}
             <Text className="text-gray-900 font-medium">Sign up</Text>
