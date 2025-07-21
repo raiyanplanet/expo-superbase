@@ -1,96 +1,72 @@
-import { Stack, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { supabase } from '../supabase/client';
+import type { User } from "@supabase/supabase-js";
+import { Stack } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Text, View } from "react-native";
+import { supabase } from "../supabase/client";
 
 export default function RootLayout() {
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const hasNavigated = useRef(false);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    // Check initial session
+    const checkInitialSession = async () => {
       try {
-        console.log('=== CHECKING AUTH ===');
-        
-        // Check if user is logged in
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('User found:', !!user);
-        
-        if (user && !hasNavigated.current) {
-          console.log('✅ User logged in, going to feed');
-          hasNavigated.current = true;
-          router.replace('/(tabs)');
-        } else if (!user && !hasNavigated.current) {
-          console.log('❌ No user, going to login');
-          hasNavigated.current = true;
-          router.replace('/login');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error getting session:', error);
         }
-        
+        setUser(session?.user ?? null);
       } catch (error) {
-        console.error('Auth check failed:', error);
-        if (!hasNavigated.current) {
-          hasNavigated.current = true;
-          router.replace('/login');
-        }
+        console.error('Error in checkInitialSession:', error);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    // Add a timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.log('⚠️ Timeout - going to login');
-      if (!hasNavigated.current) {
-        hasNavigated.current = true;
-        setLoading(false);
-        router.replace('/login');
-      }
-    }, 3000);
+    checkInitialSession();
 
-    checkAuth().finally(() => {
-      clearTimeout(timeoutId);
-    });
-
-    // Listen for auth changes
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth event:', event);
-      
-      if (event === 'SIGNED_IN' && session?.user && !hasNavigated.current) {
-        console.log('✅ Sign in detected, going to feed');
-        hasNavigated.current = true;
-        router.replace('/(tabs)');
-      } else if (event === 'SIGNED_OUT' && !hasNavigated.current) {
-        console.log('❌ Sign out detected, going to login');
-        hasNavigated.current = true;
-        router.replace('/login');
-      }
+      console.log('Auth state changed:', event, session?.user?.email);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     return () => {
-      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6' }}>
-        <Text style={{ fontSize: 16, color: '#6b7280' }}>Loading...</Text>
-        <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>Checking authentication...</Text>
-        <Pressable 
-          style={{ backgroundColor: '#3b82f6', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginTop: 20 }}
-          onPress={() => {
-            setLoading(false);
-            hasNavigated.current = true;
-            router.replace('/login');
-          }}
-        >
-          <Text style={{ color: 'white', fontWeight: '600' }}>Skip to Login</Text>
-        </Pressable>
+      <View style={{ 
+        flex: 1, 
+        justifyContent: "center", 
+        alignItems: "center",
+        backgroundColor: "#fff"
+      }}>
+        <Text style={{ fontSize: 16, color: "#666" }}>Loading...</Text>
       </View>
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
-} 
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      {user ? (
+        <>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
+          {/* Add other authenticated screens as needed */}
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        </>
+      )}
+    </Stack>
+  );
+}

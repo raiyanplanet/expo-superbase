@@ -1,13 +1,7 @@
 "use client";
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  Pressable,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Image, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { supabase } from "../../supabase/client";
 
 export default function Login() {
@@ -49,16 +43,18 @@ export default function Login() {
 
   return (
     <View className="flex-1 justify-center px-8 bg-gray-50">
-      <View className="mb-12">
-        <Text className="text-3xl font-light text-gray-900 mb-2">
-          Welcome To Fadebook
-        </Text>
-        <Text className="text-gray-500">Sign in to continue</Text>
+      <View className="mb-12 items-center justify-center">
+        <Image
+          source={require("../../assets/images/logo2.png")}
+          className="w-24 h-24"
+        />
+
+        <Text className="text-gray-500">Login to continue</Text>
       </View>
 
       <View className="space-y-4">
         <TextInput
-          className="mb-3 border border-b rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
+          className="mb-3 border  rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
           placeholder="Email"
           placeholderTextColor="#9CA3AF"
           autoCapitalize="none"
@@ -68,7 +64,7 @@ export default function Login() {
         />
 
         <TextInput
-          className="border border-b rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
+          className="border  rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
           placeholder="Password"
           placeholderTextColor="#9CA3AF"
           secureTextEntry
@@ -82,23 +78,20 @@ export default function Login() {
         ) : null}
 
         <TouchableOpacity
-          className={`rounded-lg py-4 mt-8 ${loading ? "bg-gray-400" : "bg-gray-900"}`}
+          className={`rounded-lg py-4 mt-8 ${loading ? "bg-purple-400" : "bg-purple-600"}`}
           onPress={handleLogin}
           disabled={loading}>
           <Text className="text-white text-center text-lg font-medium">
             {loading ? "Signing in..." : "Sign in"}
           </Text>
         </TouchableOpacity>
-
-        <Pressable
+        <Text className="text-gray-600 text-center mt-5">or</Text>
+        <TouchableOpacity
           onPress={() => router.replace("/register")}
-          className="mt-6"
+          className="mt-6 bg-gray-950 rounded-lg py-4"
           disabled={loading}>
-          <Text className="text-gray-600 text-center">
-            Dont have an account?{" "}
-            <Text className="text-gray-900 font-medium">Sign up</Text>
-          </Text>
-        </Pressable>
+          <Text className="text-gray-100 text-center">Create an account</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

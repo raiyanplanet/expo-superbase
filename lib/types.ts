@@ -73,3 +73,15 @@ export interface UpdateProfileData {
   avatar_url?: string;
   bio?: string;
 } 
+
+export interface Message {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  seen: boolean;
+  created_at: string;
+  updated_at: string;
+  sender_profile?: Partial<Profile>;
+  receiver_profile?: Partial<Profile>;
+} 

@@ -3,13 +3,13 @@ import { AntDesign } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    FlatList,
+    Pressable,
+    RefreshControl,
+    Text,
+    TextInput,
+    View
 } from "react-native";
 import { friendsApi, likesApi, postsApi } from "../../lib/api";
 import { Post } from "../../lib/types";
@@ -17,10 +17,10 @@ import { supabase } from "../../supabase/client";
 
 // Cache keys for AsyncStorage
 const CACHE_KEYS = {
-  POSTS: "feed_posts",
-  FRIENDS: "user_friends",
-  LIKED_POSTS: "liked_posts",
-  LAST_FETCH: "last_feed_fetch",
+  POSTS: 'feed_posts',
+  FRIENDS: 'user_friends',
+  LIKED_POSTS: 'liked_posts',
+  LAST_FETCH: 'last_feed_fetch'
 };
 
 // Cache duration (5 minutes)
@@ -39,26 +39,24 @@ export default function Feed() {
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
       try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
         if (error) {
-          console.error("Error getting session:", error);
-          router.replace("/(auth)/login");
+          console.error('Error getting session:', error);
+          router.replace('/(auth)/login');
           return;
         }
-
+        
         if (session?.user) {
-          console.log("User authenticated, redirecting to tabs");
-          router.replace("/(tabs)");
+          console.log('User authenticated, redirecting to tabs');
+          router.replace('/(tabs)');
         } else {
-          router.replace("/(auth)/login");
+          console.log('No user found, redirecting to login');
+          router.replace('/(auth)/login');
         }
       } catch (error) {
-        console.error("Error in checkAuthAndRedirect:", error);
-        router.replace("/(auth)/login");
+        console.error('Error in checkAuthAndRedirect:', error);
+        router.replace('/(auth)/login');
       }
     };
 
@@ -70,25 +68,26 @@ export default function Feed() {
     return () => clearTimeout(timer);
   }, []);
 
+
   // Cache management functions (replace with AsyncStorage in your actual app)
   const saveToCache = async (key: string, data: any) => {
     try {
       // In your actual app, use: await AsyncStorage.setItem(key, JSON.stringify(data));
       console.log(`Saving to cache: ${key}`, data);
     } catch (error) {
-      console.error("Cache save error:", error);
+      console.error('Cache save error:', error);
     }
   };
 
   const getFromCache = async (key: string) => {
     try {
-      // In your actual app, use:
+      // In your actual app, use: 
       // const data = await AsyncStorage.getItem(key);
       // return data ? JSON.parse(data) : null;
       console.log(`Getting from cache: ${key}`);
       return null; // Placeholder - replace with actual AsyncStorage
     } catch (error) {
-      console.error("Cache get error:", error);
+      console.error('Cache get error:', error);
       return null;
     }
   };
@@ -98,45 +97,15 @@ export default function Feed() {
   };
 
   useEffect(() => {
-    const loadFriendsAndFeedWithCache = async (userId: string) => {
-      try {
-        // Try to load from cache first
-        const cachedPosts = await getFromCache(CACHE_KEYS.POSTS);
-        const cachedFriends = await getFromCache(CACHE_KEYS.FRIENDS);
-        const cachedLikedPosts = await getFromCache(CACHE_KEYS.LIKED_POSTS);
-        const lastFetch = await getFromCache(CACHE_KEYS.LAST_FETCH);
-
-        // If cache is valid, use cached data
-        if (
-          cachedPosts &&
-          cachedFriends &&
-          lastFetch &&
-          isCacheValid(lastFetch)
-        ) {
-          setPosts(cachedPosts);
-          setFriends(cachedFriends);
-          if (cachedLikedPosts) {
-            setLikedPosts(new Set(cachedLikedPosts));
-          }
-          console.log("Loaded from cache");
-          // Still fetch fresh data in background
-          loadFriendsAndFeedFromAPI(userId, true);
-          return;
-        }
-        // If no valid cache, load from API
-        await loadFriendsAndFeedFromAPI(userId, false);
-      } catch (error) {
-        console.error("Error loading with cache:", error);
-        await loadFriendsAndFeedFromAPI(userId, false);
-      }
-    };
-
     const loadUserData = async () => {
       try {
         const { data } = await supabase.auth.getUser();
         if (data.user) {
           setUser(data.user);
           await loadFriendsAndFeedWithCache(data.user.id);
+        } else {
+          // This shouldn't happen since we check auth at root level
+          console.error("No user found in Feed component");
         }
       } catch (error) {
         console.error("Error loading user data:", error);
@@ -144,35 +113,64 @@ export default function Feed() {
         setInitialLoading(false);
       }
     };
+    
     loadUserData();
   }, []);
 
-  const loadFriendsAndFeedFromAPI = async (
-    userId: string,
-    isBackgroundRefresh: boolean = false
-  ) => {
+  
+  const loadFriendsAndFeedWithCache = async (userId: string) => {
     try {
-      if (!isBackgroundRefresh) {
-        console.log("Loading from API...");
+      // Try to load from cache first
+      const cachedPosts = await getFromCache(CACHE_KEYS.POSTS);
+      const cachedFriends = await getFromCache(CACHE_KEYS.FRIENDS);
+      const cachedLikedPosts = await getFromCache(CACHE_KEYS.LIKED_POSTS);
+      const lastFetch = await getFromCache(CACHE_KEYS.LAST_FETCH);
+
+      // If cache is valid, use cached data
+      if (cachedPosts && cachedFriends && lastFetch && isCacheValid(lastFetch)) {
+        setPosts(cachedPosts);
+        setFriends(cachedFriends);
+        if (cachedLikedPosts) {
+          setLikedPosts(new Set(cachedLikedPosts));
+        }
+        console.log('Loaded from cache');
+        
+        // Still fetch fresh data in background
+        loadFriendsAndFeedFromAPI(userId, true);
+        return;
       }
 
+      // If no valid cache, load from API
+      await loadFriendsAndFeedFromAPI(userId, false);
+    } catch (error) {
+      console.error("Error loading with cache:", error);
+      await loadFriendsAndFeedFromAPI(userId, false);
+    }
+  };
+
+  const loadFriendsAndFeedFromAPI = async (userId: string, isBackgroundRefresh: boolean = false) => {
+    try {
+      if (!isBackgroundRefresh) {
+        console.log('Loading from API...');
+      }
+      
       const friendsList = await friendsApi.getFriends(userId);
       setFriends(friendsList);
-
+      
       // Get all friend user IDs
       const friendIds = friendsList.map((f) =>
         f.requester_id === userId ? f.addressee_id : f.requester_id
       );
       // Optionally include the user's own posts in their feed:
       friendIds.push(userId);
-
+      
       // Fetch all posts, then filter to only those from friends (and self)
       const allPosts = await postsApi.getFeed(userId);
       const filteredPosts = allPosts.filter((post) =>
         friendIds.includes(post.user_id)
       );
       setPosts(filteredPosts);
-
+      
       // Track which posts the user has liked
       const likedPostIds = new Set<string>();
       for (const post of filteredPosts) {
@@ -187,9 +185,9 @@ export default function Feed() {
       await saveToCache(CACHE_KEYS.FRIENDS, friendsList);
       await saveToCache(CACHE_KEYS.LIKED_POSTS, Array.from(likedPostIds));
       await saveToCache(CACHE_KEYS.LAST_FETCH, Date.now());
-
+      
       if (!isBackgroundRefresh) {
-        console.log("Data loaded and cached");
+        console.log('Data loaded and cached');
       }
     } catch (error) {
       console.error("Error loading feed or friends:", error);
@@ -232,41 +230,29 @@ export default function Feed() {
 
     try {
       const isCurrentlyLiked = likedPosts.has(postId);
-
+      
       // Optimistically update UI first
       if (isCurrentlyLiked) {
         // Unlike the post
-        setLikedPosts((prev) => {
+        setLikedPosts(prev => {
           const newSet = new Set(prev);
           newSet.delete(postId);
           return newSet;
         });
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  like_count: Math.max(0, (post.like_count || 0) - 1),
-                  is_liked: false,
-                }
-              : post
-          )
-        );
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, like_count: Math.max(0, (post.like_count || 0) - 1), is_liked: false }
+            : post
+        ));
         await likesApi.unlikePost(user.id, postId);
       } else {
         // Like the post
-        setLikedPosts((prev) => new Set(prev).add(postId));
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  like_count: (post.like_count || 0) + 1,
-                  is_liked: true,
-                }
-              : post
-          )
-        );
+        setLikedPosts(prev => new Set(prev).add(postId));
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, like_count: (post.like_count || 0) + 1, is_liked: true }
+            : post
+        ));
         await likesApi.likePost(user.id, postId);
       }
     } catch (error) {
@@ -274,35 +260,23 @@ export default function Feed() {
       // Revert optimistic update on error
       const isCurrentlyLiked = likedPosts.has(postId);
       if (!isCurrentlyLiked) {
-        setLikedPosts((prev) => {
+        setLikedPosts(prev => {
           const newSet = new Set(prev);
           newSet.delete(postId);
           return newSet;
         });
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  like_count: Math.max(0, (post.like_count || 0) - 1),
-                  is_liked: false,
-                }
-              : post
-          )
-        );
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, like_count: Math.max(0, (post.like_count || 0) - 1), is_liked: false }
+            : post
+        ));
       } else {
-        setLikedPosts((prev) => new Set(prev).add(postId));
-        setPosts((prev) =>
-          prev.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  like_count: (post.like_count || 0) + 1,
-                  is_liked: true,
-                }
-              : post
-          )
-        );
+        setLikedPosts(prev => new Set(prev).add(postId));
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, like_count: (post.like_count || 0) + 1, is_liked: true }
+            : post
+        ));
       }
       Alert.alert("Error", "Failed to update like");
     }
@@ -310,7 +284,7 @@ export default function Feed() {
 
   const renderPost = ({ item }: { item: Post }) => {
     const isLiked = likedPosts.has(item.id);
-
+    
     return (
       <View className="bg-white mx-3 mb-2 rounded-xl shadow-sm border border-gray-100">
         {/* Post Header */}
@@ -370,25 +344,24 @@ export default function Feed() {
         <View className="flex-row justify-around py-2">
           <Pressable
             className={`flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50 ${
-              isLiked ? "bg-red-50" : ""
+              isLiked ? 'bg-red-50' : ''
             }`}
             onPress={() => handleLikePost(item.id)}>
-            <Text
-              className={`text-xl mr-2 ${isLiked ? "text-red-500" : "text-gray-600"}`}>
-              {isLiked ? "❤️" : "🤍"}
+            <Text className={`text-xl mr-2 ${isLiked ? 'text-red-500' : 'text-gray-600'}`}>
+              {isLiked ? '❤️' : '🤍'}
             </Text>
           </Pressable>
 
           <Pressable
             className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50"
             onPress={() => router.push(`../post/${item.id}`)}>
-            <AntDesign name="message1" size={20} color="black" />
+           <AntDesign name="message1" size={20} color="black" />
           </Pressable>
 
           <Pressable
             className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50"
             onPress={() => router.push(`../post/${item.id}`)}>
-            <AntDesign name="sharealt" size={20} color="black" />
+            <AntDesign name="sharealt"  size={20} color="black" />
           </Pressable>
         </View>
       </View>
@@ -404,6 +377,7 @@ export default function Feed() {
     );
   }
 
+  
   return (
     <View className="flex-1 bg-gray-100">
       {/* Create Post Section */}
@@ -432,7 +406,7 @@ export default function Feed() {
           {newPost.trim() && (
             <View className="mb-3">
               <TextInput
-                className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-base min-h-20 max-h-56"
+                className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-base min-h-20"
                 placeholder="Share your thoughts..."
                 value={newPost}
                 onChangeText={setNewPost}
@@ -441,6 +415,7 @@ export default function Feed() {
               />
             </View>
           )}
+
           {/* Action Row */}
           <View className="border-t border-gray-100 pt-3 mt-3">
             <View className="flex-row justify-between items-center">

@@ -1,19 +1,21 @@
 "use client";
+import { AntDesign, FontAwesome } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  RefreshControl,
-  SafeAreaView,
-  Text,
-  TextInput,
-  View
+    Alert,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    RefreshControl,
+
+    Text,
+    TextInput,
+    View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { commentsApi, likesApi } from "../../lib/api";
 import { Comment, Post } from "../../lib/types";
 import { supabase } from "../../supabase/client";
@@ -331,7 +333,7 @@ export default function PostDetail() {
 
   const handleInputFocus = () => {
     setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToEnd({ animated: true });
     }, Platform.OS === "ios" ? 300 : 500);
   };
 
@@ -398,24 +400,18 @@ export default function PostDetail() {
                   }`}>
                   {post.is_liked ? "❤️" : "🤍"}
                 </Text>
-                <Text
-                  className={`font-medium ${
-                    post.is_liked ? "text-red-600" : "text-gray-600"
-                  }`}>
-                  {likeLoading ? "Loading..." : "Like"}
-                </Text>
+                
               </Pressable>
 
               <Pressable
                 className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50"
                 onPress={() => textInputRef.current?.focus()}>
-                <Text className="text-xl mr-2">💬</Text>
-                <Text className="text-gray-600 font-medium">Comment</Text>
+                <AntDesign name="message1" size={20} color="black" />
               </Pressable>
 
               <Pressable className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50">
-                <Text className="text-xl mr-2">📤</Text>
-                <Text className="text-gray-600 font-medium">Share</Text>
+              <AntDesign name="sharealt"  size={20} color="black" />
+                
               </Pressable>
             </View>
           </View>
@@ -456,9 +452,9 @@ export default function PostDetail() {
               {user && item.user_id === user.id && (
                 <Pressable
                   onPress={() => handleDeleteComment(item.id)}
-                  className="ml-2 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center"
+                  className="ml-2 w-6 h-6 rounded-full  flex items-center justify-center"
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Text className="text-white text-xs font-bold">×</Text>
+                  <FontAwesome name="trash-o" size={20} color="red" />
                 </Pressable>
               )}
             </View>
@@ -473,7 +469,7 @@ export default function PostDetail() {
 
   const renderEmptyComments = () => (
     <View className="bg-white p-8 items-center">
-      <Text className="text-gray-400 text-base">💬</Text>
+      <AntDesign name="message1" size={24} color="black" />
       <Text className="text-gray-500 mt-2">No comments yet</Text>
       <Text className="text-gray-400 text-sm mt-1">
         Be the first to comment!
@@ -504,7 +500,7 @@ export default function PostDetail() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
@@ -525,7 +521,7 @@ export default function PostDetail() {
           ref={flatListRef}
           data={comments}
           renderItem={renderComment}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmptyComments}
           refreshControl={
@@ -549,7 +545,7 @@ export default function PostDetail() {
 
         {/* Comment Input */}
         {user && (
-          <View 
+          <View
             className="bg-white border-t border-gray-200"
             style={{
               paddingBottom: Platform.OS === "ios" ? 20 : 16,
@@ -558,14 +554,14 @@ export default function PostDetail() {
             }}
           >
             <View className="flex-row items-end">
-              <View className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-3 mb-1">
+              <View className="w-14 h-14 rounded-full bg-purple-500 flex items-center justify-center mr-3 mb-1">
                 <Text className="text-sm font-bold text-white">
                   {user?.email?.charAt(0).toUpperCase() || "U"}
                 </Text>
               </View>
               <TextInput
                 ref={textInputRef}
-                className="flex-1 border border-gray-300 rounded-full px-4 py-2 mr-3 min-h-[36px] max-h-[100px]"
+                className="flex-1 border border-gray-300 rounded-full px-4 py-4 mr-3  max-h-[100px]"
                 placeholder="Write a comment..."
                 value={newComment}
                 onChangeText={setNewComment}
@@ -577,7 +573,7 @@ export default function PostDetail() {
                 returnKeyType="default"
               />
               <Pressable
-                className={`rounded-full px-6 py-2 ${
+                className={`rounded-full px-6 py-4 ${
                   newComment.trim() && !commentLoading
                     ? "bg-blue-500"
                     : "bg-gray-300"

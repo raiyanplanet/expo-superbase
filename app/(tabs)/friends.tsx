@@ -53,13 +53,7 @@ export default function Friends() {
     try {
       setLoading(true);
       const results = await profileApi.searchUsers(searchQuery);
-      const filteredResults = results.filter(profile => 
-        profile.id !== user?.id && 
-        !friends.some(friend => 
-          friend.requester_id === profile.id || friend.addressee_id === profile.id
-        )
-      );
-      setSearchResults(filteredResults);
+      setSearchResults(results);
     } catch (error) {
       console.error('Error searching users:', error);
     } finally {
@@ -122,7 +116,9 @@ export default function Friends() {
     return (
       <View className="bg-white rounded-lg p-4 mb-3 shadow-sm">
         <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center flex-1">
+          <Pressable 
+            className="flex-row items-center flex-1"
+            onPress={() => router.push(`/user/${friendProfile.id}` as any)}>
             <View className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center mr-3">
               <Text className="text-lg font-bold text-blue-600">
                 {friendProfile.username?.charAt(0).toUpperCase() || 'U'}
@@ -132,12 +128,12 @@ export default function Friends() {
               <Text className="font-semibold">{friendProfile.full_name || friendProfile.username || 'Unknown User'}</Text>
               <Text className="text-gray-500 text-sm">{friendProfile.bio || 'No bio'}</Text>
             </View>
-          </View>
+          </Pressable>
           <Pressable 
             className="bg-red-500 rounded-lg px-3 py-1"
             onPress={() => handleRemoveFriend(item.id)}
           >
-            <Text className="text-white text-sm">Remove</Text>
+            <Text className="text-white text-sm">Unfriend</Text>
           </Pressable>
         </View>
       </View>
@@ -150,7 +146,9 @@ export default function Friends() {
 
     return (
       <View className="bg-white rounded-lg p-4 mb-3 shadow-sm">
-        <View className="flex-row items-center mb-3">
+        <Pressable 
+          className="flex-row items-center mb-3"
+          onPress={() => router.push(`/user/${requesterProfile.id}` as any)}>
           <View className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center mr-3">
             <Text className="text-lg font-bold text-blue-600">
               {requesterProfile.username?.charAt(0).toUpperCase() || 'U'}
@@ -160,7 +158,7 @@ export default function Friends() {
             <Text className="font-semibold">{requesterProfile.full_name || requesterProfile.username || 'Unknown User'}</Text>
             <Text className="text-gray-500 text-sm">{requesterProfile.bio || 'No bio'}</Text>
           </View>
-        </View>
+        </Pressable>
         <View className="flex-row">
           <Pressable 
             className="bg-green-500 rounded-lg px-4 py-2 mr-2 flex-1"
@@ -182,7 +180,9 @@ export default function Friends() {
   const renderSearchResult = ({ item }: { item: Profile }) => (
     <View className="bg-white rounded-lg p-4 mb-3 shadow-sm">
       <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center flex-1">
+        <Pressable 
+          className="flex-row items-center flex-1"
+          onPress={() => router.push(`/user/${item.id}` as any)}>
           <View className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center mr-3">
             <Text className="text-lg font-bold text-blue-600">
               {item.username?.charAt(0).toUpperCase() || 'U'}
@@ -192,7 +192,7 @@ export default function Friends() {
             <Text className="font-semibold">{item.full_name || item.username || 'Unknown User'}</Text>
             <Text className="text-gray-500 text-sm">{item.bio || 'No bio'}</Text>
           </View>
-        </View>
+        </Pressable>
         <Pressable 
           className="bg-blue-500 rounded-lg px-3 py-1"
           onPress={() => handleSendFriendRequest(item.id)}
@@ -262,7 +262,7 @@ export default function Friends() {
 
       {/* Content */}
       {activeTab === 'friends' && (
-        <FlatList
+      <FlatList
           data={friends}
           renderItem={renderFriend}
           keyExtractor={(item) => item.id}
@@ -295,15 +295,15 @@ export default function Friends() {
         <FlatList
           data={searchResults}
           renderItem={renderSearchResult}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View className="flex-1 justify-center items-center py-8">
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ padding: 16 }}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View className="flex-1 justify-center items-center py-8">
               <Text className="text-gray-500 text-center">Search for users to add as friends</Text>
-            </View>
-          }
-        />
+          </View>
+        }
+      />
       )}
     </View>
   );
