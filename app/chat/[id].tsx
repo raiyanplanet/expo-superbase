@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { messagesApi, profileApi } from "../../lib/api";
 import { Message, Profile } from "../../lib/types";
 import { supabase } from "../../supabase/client";
+import { chatEventBus } from '../event-bus';
 
 // Custom hook for keyboard handling
 const useKeyboardHeight = () => {
@@ -349,9 +350,11 @@ export default function ChatRoom() {
       subscriptionRef.current.unsubscribe();
     }
 
+    // Always use sorted IDs for channel
+    const sortedIds = [userId, friendId].sort();
     subscriptionRef.current = messagesApi.subscribeToMessages(
-      userId,
-      friendId,
+      sortedIds[0],
+      sortedIds[1],
       (newMessage) => {
         setMessages((prev) => {
           // Avoid duplicates
@@ -411,6 +414,10 @@ export default function ChatRoom() {
       setMessages((prev) =>
         prev.map((msg) => (msg.id === optimisticMessage.id ? sentMessage : msg))
       );
+
+      // Emit event to update chat list
+      chatEventBus.emit('refreshChatList');
+      console.log('chatEventBus: refreshChatList emitted');
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message");
@@ -431,6 +438,20 @@ export default function ChatRoom() {
       setRefreshing(true);
       await loadFriendAndMessages(user.id, true);
     }
+  }, [user, friendId]);
+
+  // Subscribe to global incoming messages for auto-refresh
+  useEffect(() => {
+    if (!user) return;
+    const globalSub = messagesApi.subscribeToIncomingMessages(user.id, (message) => {
+      if (message.sender_id === friendId) {
+        // New message from the current chat friend, refresh chat
+        loadFriendAndMessages(user.id, true);
+      }
+    });
+    return () => {
+      globalSub.unsubscribe();
+    };
   }, [user, friendId]);
 
   // Cleanup subscription on unmount
@@ -531,3 +552,4 @@ export default function ChatRoom() {
     </SafeAreaView>
   );
 }
+

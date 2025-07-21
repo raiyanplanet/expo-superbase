@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 import { messagesApi } from "../../lib/api";
 import { supabase } from "../../supabase/client";
@@ -63,6 +63,7 @@ function ChatTabIcon({ color, focused, size }: { color: string; focused: boolean
 }
 
 export default function TabLayout() {
+  const feedRef = useRef<{ refreshAndScrollToTop: () => void }>(null);
   return (
     <Tabs
       screenOptions={{
@@ -76,11 +77,9 @@ export default function TabLayout() {
           height: Platform.OS === "ios" ? 80 : 60, // Reduced height since no labels
           paddingBottom: Platform.OS === "ios" ? 20 : 8,
           paddingTop: 8,
-          
         },
         headerStyle: {
           backgroundColor: "#ffffff",
-          
         },
         headerTitleStyle: {
           fontWeight: "700",
@@ -104,6 +103,16 @@ export default function TabLayout() {
           ),
           headerTitle: "🏠 Home Feed",
         }}
+        listeners={{
+          tabPress: (e) => {
+            // If already focused, refresh and scroll to top
+            if (feedRef.current) {
+              feedRef.current.refreshAndScrollToTop();
+            }
+          },
+        }}
+        // @ts-ignore
+        ref={feedRef}
       />
       <Tabs.Screen
         name="friends"

@@ -1,7 +1,7 @@
 "use client";
 import { AntDesign } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -35,6 +35,35 @@ export default function Feed() {
   const [posting, setPosting] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  
+  // Add ref for FlatList
+  const flatListRef = useRef<FlatList>(null);
+  const lastFocusTime = useRef<number>(0);
+
+  // Handle tab focus - refresh and scroll to top when tab is pressed multiple times
+  useFocusEffect(
+    useCallback(() => {
+      const currentTime = Date.now();
+      
+      // If the tab was focused again within 1 second, refresh and scroll to top
+      if (currentTime - lastFocusTime.current < 1000 && user) {
+        const refreshAndScroll = async () => {
+          setRefreshing(true);
+          await loadFriendsAndFeed(user.id);
+          setRefreshing(false);
+          
+          // Scroll to top
+          setTimeout(() => {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }, 100);
+        };
+        
+        refreshAndScroll();
+      }
+      
+      lastFocusTime.current = currentTime;
+    }, [user])
+  );
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
@@ -420,6 +449,7 @@ export default function Feed() {
               <TextInput
                 className="bg-gray-100 rounded-full px-4 py-3 text-base"
                 placeholder="What's on your mind?"
+                 placeholderTextColor="#9CA3AF"
                 value={newPost}
                 onChangeText={setNewPost}
                 multiline={false}
@@ -475,6 +505,7 @@ export default function Feed() {
 
       {/* Posts Feed */}
       <FlatList
+        ref={flatListRef}
         data={posts}
         renderItem={renderPost}
         keyExtractor={(item) => item.id}

@@ -3,17 +3,17 @@ import { AntDesign, FontAwesome } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    RefreshControl,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
 
-    Text,
-    TextInput,
-    View
+  Text,
+  TextInput,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { commentsApi, likesApi } from "../../lib/api";
@@ -563,6 +563,7 @@ export default function PostDetail() {
                 ref={textInputRef}
                 className="flex-1 border border-gray-300 rounded-full px-4 py-4 mr-3  max-h-[100px]"
                 placeholder="Write a comment..."
+                 placeholderTextColor="#9CA3AF"
                 value={newComment}
                 onChangeText={setNewComment}
                 onFocus={handleInputFocus}

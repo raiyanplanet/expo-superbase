@@ -558,9 +558,20 @@ export const messagesApi = {
     if (error) throw error;
   },
 
+  async deleteAllMessagesWithFriend(userId1: string, userId2: string): Promise<void> {
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`);
+    if (error) throw error;
+  },
+
   subscribeToMessages(userId1: string, userId2: string, callback: (message: Message) => void) {
+    // Always use the same channel name for both users
+    const sortedIds = [userId1, userId2].sort();
+    const channelName = `messages:${sortedIds[0]}:${sortedIds[1]}`;
     return supabase
-      .channel(`messages:${userId1}:${userId2}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -571,8 +582,31 @@ export const messagesApi = {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            console.log('Realtime: new message received', payload.new); // Debug log
             callback(payload.new as Message);
           }
+        }
+      )
+      .subscribe();
+  },
+
+  /**
+   * Subscribe to all incoming messages for a user (for global notifications/badges)
+   */
+  subscribeToIncomingMessages(userId: string, callback: (message: Message) => void) {
+    return supabase
+      .channel(`incoming-messages:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('Global Realtime: new incoming message', payload.new);
+          callback(payload.new as Message);
         }
       )
       .subscribe();

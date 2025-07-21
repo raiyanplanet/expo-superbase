@@ -1,17 +1,17 @@
 "use client";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { friendsApi, postsApi, profileApi } from "../../lib/api";
 import { Friend, Post, Profile } from "../../lib/types";
@@ -43,7 +43,7 @@ export default function ProfileTab() {
         router.replace("/login");
         return;
       }
-      
+
       setUser(data.user);
       await Promise.all([
         loadProfile(data.user.id),
@@ -111,12 +111,16 @@ export default function ProfileTab() {
       setLoading(true);
       // Update email if changed
       if (editForm.email && editForm.email !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({ email: editForm.email });
+        const { error: emailError } = await supabase.auth.updateUser({
+          email: editForm.email,
+        });
         if (emailError) throw emailError;
       }
       // Update password if provided
       if (editForm.password) {
-        const { error: passError } = await supabase.auth.updateUser({ password: editForm.password });
+        const { error: passError } = await supabase.auth.updateUser({
+          password: editForm.password,
+        });
         if (passError) throw passError;
       }
       await profileApi.updateProfile(user.id, {
@@ -137,40 +141,36 @@ export default function ProfileTab() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            // Show loading state
+            setLoading(true);
+
+            // Perform the actual logout
+            await supabase.auth.signOut();
+            // Clear AsyncStorage session
+            await AsyncStorage.clear();
+
+            console.log("✅ Logout completed");
+
+            // Immediately navigate to login screen
+            router.replace("/login");
+          } catch (error) {
+            console.error("Logout error:", error);
+            Alert.alert("Error", "Failed to logout. Please try again.");
+            setLoading(false);
+          }
         },
-        {
-          text: "Logout",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Show loading state
-              setLoading(true);
-              
-              // Perform the actual logout
-    await supabase.auth.signOut();
-              // Clear AsyncStorage session
-    await AsyncStorage.clear();
-              
-              console.log("✅ Logout completed");
-              
-              // Immediately navigate to login screen
-              router.replace("/login");
-            } catch (error) {
-              console.error("Logout error:", error);
-              Alert.alert("Error", "Failed to logout. Please try again.");
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleDeletePost = async (postId: string) => {
@@ -190,7 +190,7 @@ export default function ProfileTab() {
               setLoading(true);
               await postsApi.deletePost(postId);
               // Remove the post from the local state
-              setPosts(posts.filter(post => post.id !== postId));
+              setPosts(posts.filter((post) => post.id !== postId));
               Alert.alert("Success", "Post deleted successfully!");
             } catch (error) {
               console.error("Error deleting post:", error);
@@ -248,11 +248,11 @@ export default function ProfileTab() {
           <Text className="text-gray-600 font-bold text-lg">⋯</Text>
         </Pressable>
       </View>
-      
+
       <Text className="text-gray-800 mb-4 leading-6 text-base">
         {item.content}
       </Text>
-      
+
       <View className="flex-row justify-between items-center pt-4 border-t border-gray-100">
         <View className="flex-row items-center bg-red-50 px-3 py-2 rounded-full">
           <Text className="text-red-500 mr-2">❤️</Text>
@@ -260,15 +260,15 @@ export default function ProfileTab() {
             {item.like_count || 0}
           </Text>
         </View>
-        
+
         <View className="flex-row items-center bg-blue-50 px-3 py-2 rounded-full">
           <Text className="text-blue-500 mr-2">💬</Text>
           <Text className="text-blue-600 font-semibold">
             {item.comment_count || 0}
           </Text>
         </View>
-        
-        <Pressable 
+
+        <Pressable
           className="bg-purple-600 px-4 py-2 rounded-full "
           onPress={() => router.push(`/post/${item.id}` as any)}>
           <Text className="text-white font-semibold text-sm">View Post</Text>
@@ -303,22 +303,22 @@ export default function ProfileTab() {
             {profile.bio || "No bio yet"}
           </Text>
           <View className="flex-row space-x-4 gap-3">
-            <Pressable 
+            <Pressable
               className="bg-purple-500 bg-opacity-20 backdrop-blur-sm rounded-full px-6 py-3 "
               onPress={() => setShowEditModal(true)}>
-              <Text className="text-white font-bold">✏️ Edit Profile</Text>
+              <Text className="text-white font-bold">Edit Profile</Text>
             </Pressable>
-            <Pressable 
-              className={`${loading ? 'bg-gray-500' : 'bg-red-500 bg-opacity-90'} rounded-full px-6 py-3`}
+            <Pressable
+              className={`${loading ? "bg-gray-500" : "bg-red-500 bg-opacity-90"} rounded-full px-6 py-3`}
               onPress={handleLogout}
               disabled={loading}>
               <Text className="text-white font-bold">
-                {loading ? "⏳ Logging out..." : "🚪 Logout"}
+                {loading ? "Logging out..." : "Logout"}
               </Text>
             </Pressable>
           </View>
-          </View>
         </View>
+      </View>
 
       {/* Stats Section */}
       <View className="bg-white mx-4 -mt-6 rounded-2xl  p-6 relative z-20 border border-gray-100">
@@ -376,7 +376,9 @@ export default function ProfileTab() {
                 : item.requester_profile;
             if (!friendProfile) return null;
             return (
-              <View className="items-center mr-6">
+              <Pressable
+                onPress={() => router.push(`/user/${friendProfile.id}`)}
+                className="items-center mr-6">
                 <View className="w-16 h-16 rounded-full bg-purple-500 flex items-center justify-center mb-3 ">
                   <Text className="text-2xl font-bold text-white">
                     {friendProfile.username?.charAt(0).toUpperCase() || "U"}
@@ -389,7 +391,7 @@ export default function ProfileTab() {
                     friendProfile.username ||
                     "Unknown"}
                 </Text>
-              </View>
+              </Pressable>
             );
           }}
           ListEmptyComponent={
@@ -432,7 +434,12 @@ export default function ProfileTab() {
                     : item.requester_profile;
                 if (!friendProfile) return null;
                 return (
-                  <View className="flex-row items-center mb-4 p-3 bg-gray-50 rounded-xl">
+                  <Pressable
+                    onPress={() => {
+                      setShowFriendsModal(false);
+                      router.push(`/user/${friendProfile.id}`);
+                    }}
+                    className="flex-row items-center mb-4 p-3 bg-gray-50 rounded-xl">
                     <View className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-orange-500 flex items-center justify-center mr-4 ">
                       <Text className="text-xl font-bold text-white">
                         {friendProfile.username?.charAt(0).toUpperCase() || "U"}
@@ -443,7 +450,7 @@ export default function ProfileTab() {
                         friendProfile.username ||
                         "Unknown"}
                     </Text>
-                  </View>
+                  </Pressable>
                 );
               }}
               ListEmptyComponent={
@@ -497,10 +504,12 @@ export default function ProfileTab() {
               <Text className="text-lg font-bold text-gray-900 mb-4 text-center">
                 Post Options
               </Text>
-              
+
               <Pressable
                 className="flex-row items-center p-3 rounded-xl bg-red-50 mb-2"
-                onPress={() => selectedPostId && handleDeletePost(selectedPostId)}>
+                onPress={() =>
+                  selectedPostId && handleDeletePost(selectedPostId)
+                }>
                 <Text className="text-red-600 mr-3">🗑️</Text>
                 <Text className="text-red-600 font-semibold">Delete Post</Text>
               </Pressable>
@@ -521,63 +530,67 @@ export default function ProfileTab() {
         <View className="flex-1 justify-end bg-black/60">
           <View className="bg-white rounded-t-3xl p-6 ">
             <View className="w-12 h-1.5 bg-gray-300 rounded-full self-center mb-8" />
-            
+
             <Text className="text-2xl font-bold mb-8 text-gray-900">
               ✏️ Edit Profile
             </Text>
-            
+
             <View className="space-y-4 mb-8 gap-3">
-            <TextInput
+              <TextInput
                 className="border-2 border-gray-200 rounded-2xl p-4 text-base  focus:border-blue-500"
-              placeholder="Username"
-              value={editForm.username}
+                placeholder="Username"
+                value={editForm.username}
                 onChangeText={(text) =>
                   setEditForm((prev) => ({ ...prev, username: text }))
                 }
                 placeholderTextColor="#9CA3AF"
-            />
-            
-            <TextInput
+              />
+
+              <TextInput
                 className="border-2 border-gray-200 rounded-2xl p-4 text-base bg-gray-50 focus:border-blue-500"
-              placeholder="Full Name"
-              value={editForm.full_name}
+                placeholder="Full Name"
+                value={editForm.full_name}
                 onChangeText={(text) =>
                   setEditForm((prev) => ({ ...prev, full_name: text }))
                 }
                 placeholderTextColor="#9CA3AF"
-            />
-            
-            <TextInput
+              />
+
+              <TextInput
                 className="border-2 border-gray-200 rounded-2xl p-4 text-base bg-gray-50 focus:border-blue-500"
                 placeholder="Tell us about yourself..."
-              value={editForm.bio}
+                value={editForm.bio}
                 onChangeText={(text) =>
                   setEditForm((prev) => ({ ...prev, bio: text }))
                 }
-              multiline
+                multiline
                 numberOfLines={4}
                 textAlignVertical="top"
                 placeholderTextColor="#9CA3AF"
-            />
-            <TextInput
-  className="border-2 border-gray-200 rounded-2xl p-4 text-base bg-gray-50 focus:border-blue-500"
-  placeholder="Email"
-  value={editForm.email}
-  onChangeText={(text) => setEditForm((prev) => ({ ...prev, email: text }))}
-  autoCapitalize="none"
-  keyboardType="email-address"
-  placeholderTextColor="#9CA3AF"
-/>
-<TextInput
-  className="border-2 border-gray-200 rounded-2xl p-4 text-base bg-gray-50 focus:border-blue-500"
-  placeholder="New Password (leave blank to keep current)"
-  value={editForm.password}
-  onChangeText={(text) => setEditForm((prev) => ({ ...prev, password: text }))}
-  secureTextEntry
-  placeholderTextColor="#9CA3AF"
-/>
+              />
+              <TextInput
+                className="border-2 border-gray-200 rounded-2xl p-4 text-base bg-gray-50 focus:border-blue-500"
+                placeholder="Email"
+                value={editForm.email}
+                onChangeText={(text) =>
+                  setEditForm((prev) => ({ ...prev, email: text }))
+                }
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholderTextColor="#9CA3AF"
+              />
+              <TextInput
+                className="border-2 border-gray-200 rounded-2xl p-4 text-base bg-gray-50 focus:border-blue-500"
+                placeholder="New Password (leave blank to keep current)"
+                value={editForm.password}
+                onChangeText={(text) =>
+                  setEditForm((prev) => ({ ...prev, password: text }))
+                }
+                secureTextEntry
+                placeholderTextColor="#9CA3AF"
+              />
             </View>
-            
+
             <View className="flex-row space-x-4 gap-4">
               <Pressable
                 className="flex-1 bg-gray-100 rounded-2xl py-4 "
@@ -586,7 +599,7 @@ export default function ProfileTab() {
                   Cancel
                 </Text>
               </Pressable>
-              
+
               <Pressable
                 className="flex-1  bg-purple-600 rounded-2xl py-4 "
                 onPress={handleUpdateProfile}
@@ -603,4 +616,4 @@ export default function ProfileTab() {
       <View className="h-6" />
     </ScrollView>
   );
-} 
+}
