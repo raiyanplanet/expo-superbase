@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   Text,
@@ -35,7 +36,9 @@ export default function Feed() {
   const [posting, setPosting] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set()); // Track expanded posts
+  const [showPostModal, setShowPostModal] = useState(false); // For post input modal
+
   // Add ref for FlatList
   const flatListRef = useRef<FlatList>(null);
   const lastFocusTime = useRef<number>(0);
@@ -44,23 +47,23 @@ export default function Feed() {
   useFocusEffect(
     useCallback(() => {
       const currentTime = Date.now();
-      
+
       // If the tab was focused again within 1 second, refresh and scroll to top
       if (currentTime - lastFocusTime.current < 1000 && user) {
         const refreshAndScroll = async () => {
           setRefreshing(true);
           await loadFriendsAndFeed(user.id);
           setRefreshing(false);
-          
+
           // Scroll to top
           setTimeout(() => {
             flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
           }, 100);
         };
-        
+
         refreshAndScroll();
       }
-      
+
       lastFocusTime.current = currentTime;
     }, [user])
   );
@@ -248,6 +251,7 @@ export default function Feed() {
       setNewPost("");
       // Refresh feed and update cache
       await loadFriendsAndFeedFromAPI(user.id, false);
+      setShowPostModal(false); // Close modal after posting
     } catch (error) {
       console.error("Error creating post:", error);
       Alert.alert("Error", "Failed to create post");
@@ -337,8 +341,27 @@ export default function Feed() {
     }
   };
 
+  // Add this function to toggle expanded state for posts
+  const toggleExpandPost = (postId: string) => {
+    setExpandedPosts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
+
   const renderPost = ({ item }: { item: Post }) => {
     const isLiked = likedPosts.has(item.id);
+    const MAX_LENGTH = 200;
+    const isExpanded = expandedPosts.has(item.id);
+    const shouldTruncate = item.content.length > MAX_LENGTH && !isExpanded;
+    const displayContent = shouldTruncate
+      ? item.content.slice(0, MAX_LENGTH) + "..."
+      : item.content;
 
     return (
       <View className="bg-white mx-3 mb-2 rounded-xl shadow-sm border border-gray-100">
@@ -372,26 +395,22 @@ export default function Feed() {
         {/* Post Content */}
         <View className="px-4 pb-3">
           <Text className="text-gray-800 text-base leading-6">
-            {item.content}
-          </Text>
-        </View>
-
-        {/* Engagement Stats */}
-        <View className="px-4 pb-2">
-          <View className="flex-row justify-between items-center">
-            <View className="flex-row items-center">
-              <Text className="text-xs text-gray-500">
-                {(item.like_count ?? 0) > 0
-                  ? `${item.like_count ?? 0} ${(item.like_count ?? 0) === 1 ? "like" : "likes"}`
-                  : ""}
+            {displayContent}
+            {shouldTruncate && (
+              <Text
+                className="text-blue-500 font-medium"
+                onPress={() => toggleExpandPost(item.id)}>
+                {" Read More"}
               </Text>
-            </View>
-            <Text className="text-xs text-gray-500">
-              {(item.comment_count ?? 0) > 0
-                ? `${item.comment_count ?? 0} ${(item.comment_count ?? 0) === 1 ? "comment" : "comments"}`
-                : ""}
-            </Text>
-          </View>
+            )}
+            {isExpanded && item.content.length > MAX_LENGTH && (
+              <Text
+                className="text-blue-500 font-medium"
+                onPress={() => toggleExpandPost(item.id)}>
+                {" Show Less"}
+              </Text>
+            )}
+          </Text>
         </View>
 
         {/* Action Buttons */}
@@ -406,12 +425,18 @@ export default function Feed() {
               className={`text-xl mr-2 ${isLiked ? "text-red-500" : "text-gray-600"}`}>
               {isLiked ? "❤️" : "🤍"}
             </Text>
+            <Text className="text-md text-gray-500">
+              {item.like_count ?? 0}
+            </Text>
           </Pressable>
 
           <Pressable
             className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50"
             onPress={() => router.push(`../post/${item.id}`)}>
             <AntDesign name="message1" size={20} color="black" />
+            <Text className="text-md text-gray-500 ml-2">
+              {item.comment_count ?? 0}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -437,43 +462,56 @@ export default function Feed() {
     <View className="flex-1 bg-gray-100">
       {/* Create Post Section */}
       <View className="bg-white mx-3 mt-2 mb-2 rounded-xl shadow-sm border border-gray-100">
-        <View className="p-4">
-          {/* User Avatar and Input */}
-          <View className="flex-row items-center mb-3">
-            <View className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center mr-3">
-              <Text className="text-lg font-bold text-white">
-                {user?.email?.charAt(0).toUpperCase() || "U"}
+        <Pressable
+          onPress={() => setShowPostModal(true)}
+          className="p-4 flex-row items-center">
+          <View className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center mr-3">
+            <Text className="text-lg font-bold text-white">
+              {user?.email?.charAt(0).toUpperCase() || "U"}
+            </Text>
+          </View>
+          <View className="flex-1">
+            <Text className="bg-gray-100 rounded-full px-4 py-3 text-base text-gray-500">
+              {"What's on your mind?"}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+
+      {/* Post Input Modal */}
+      <Modal
+        visible={showPostModal}
+        animationType="none"
+        transparent={true}
+        onRequestClose={() => setShowPostModal(false)}>
+        <View className="flex-1 bg-black bg-opacity-40">
+          <View className="flex-1 bg-white pt-8 px-4 pb-4">
+            <Pressable
+              className="absolute top-4 right-4 z-10 p-2"
+              onPress={() => setShowPostModal(false)}>
+              <Text className="text-3xl text-gray-400">×</Text>
+            </Pressable>
+            <View className="flex-row items-center mb-6 mt-2">
+              <View className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center mr-3">
+                <Text className="text-lg font-bold text-white">
+                  {user?.email?.charAt(0).toUpperCase() || "U"}
+                </Text>
+              </View>
+              <Text className="font-semibold text-gray-900 text-base">
+                {user?.full_name || user?.email || "User"}
               </Text>
             </View>
-            <View className="flex-1">
-              <TextInput
-                className="bg-gray-100 rounded-full px-4 py-3 text-base"
-                placeholder="What's on your mind?"
-                 placeholderTextColor="#9CA3AF"
-                value={newPost}
-                onChangeText={setNewPost}
-                multiline={false}
-                style={{ maxHeight: 100 }}
-              />
-            </View>
-          </View>
-
-          {/* Expanded Text Area (when typing) */}
-          {newPost.trim() && (
-            <View className="mb-3">
-              <TextInput
-                className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-base min-h-20 max-h-56"
-                placeholder="Share your thoughts..."
-                value={newPost}
-                onChangeText={setNewPost}
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
-          )}
-          {/* Action Row */}
-          <View className="border-t border-gray-100 pt-3 mt-3">
-            <View className="flex-row justify-between items-center">
+            <TextInput
+              className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-base min-h-32 max-h-32 mb-3"
+              placeholder="What's on your mind?"
+              placeholderTextColor="#9CA3AF"
+              value={newPost}
+              onChangeText={setNewPost}
+              multiline
+              textAlignVertical="top"
+              autoFocus
+            />
+            <View className="flex-row justify-between items-center mt-2">
               <View className="flex-row">
                 <Pressable className="flex-row items-center mr-6 py-2">
                   <Text className="text-lg mr-2">📷</Text>
@@ -484,7 +522,6 @@ export default function Feed() {
                   <Text className="text-gray-600 font-medium">Feeling</Text>
                 </Pressable>
               </View>
-
               <Pressable
                 className={`px-6 py-2 rounded-full ${
                   newPost.trim() && !posting ? "bg-blue-500" : "bg-gray-300"
@@ -501,7 +538,7 @@ export default function Feed() {
             </View>
           </View>
         </View>
-      </View>
+      </Modal>
 
       {/* Posts Feed */}
       <FlatList

@@ -1,4 +1,5 @@
 "use client";
+import { AntDesign, Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -35,6 +36,11 @@ export default function ProfileTab() {
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showPostMenu, setShowPostMenu] = useState(false);
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set()); // Track expanded posts
+  const [showLogoutModal, setShowLogoutModal] = useState(false); // For logout confirmation
+  const [showEditPostModal, setShowEditPostModal] = useState(false); // For editing post
+  const [editPostContent, setEditPostContent] = useState("");
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -141,36 +147,23 @@ export default function ProfileTab() {
   };
 
   const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            // Show loading state
-            setLoading(true);
+    setShowLogoutModal(true);
+  };
 
-            // Perform the actual logout
-            await supabase.auth.signOut();
-            // Clear AsyncStorage session
-            await AsyncStorage.clear();
-
-            console.log("✅ Logout completed");
-
-            // Immediately navigate to login screen
-            router.replace("/login");
-          } catch (error) {
-            console.error("Logout error:", error);
-            Alert.alert("Error", "Failed to logout. Please try again.");
-            setLoading(false);
-          }
-        },
-      },
-    ]);
+  const confirmLogout = async () => {
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
+      await AsyncStorage.clear();
+      console.log("✅ Logout completed");
+      setShowLogoutModal(false);
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      Alert.alert("Error", "Failed to logout. Please try again.");
+      setLoading(false);
+      setShowLogoutModal(false);
+    }
   };
 
   const handleDeletePost = async (postId: string) => {
@@ -211,6 +204,55 @@ export default function ProfileTab() {
     setShowPostMenu(true);
   };
 
+  const openEditPostModal = (postId: string) => {
+    const post = posts.find((p) => p.id === postId);
+    if (post) {
+      setEditingPostId(postId);
+      setEditPostContent(post.content);
+      setShowEditPostModal(true);
+      setShowPostMenu(false);
+    }
+  };
+
+  const handleEditPost = async () => {
+    if (!editingPostId || !editPostContent.trim()) return;
+    try {
+      setLoading(true);
+      await postsApi.updatePost(editingPostId, {
+        content: editPostContent.trim(),
+      });
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === editingPostId
+            ? { ...post, content: editPostContent.trim() }
+            : post
+        )
+      );
+      setShowEditPostModal(false);
+      setEditingPostId(null);
+      setEditPostContent("");
+      Alert.alert("Success", "Post updated successfully!");
+    } catch (error) {
+      console.error("Error updating post:", error);
+      Alert.alert("Error", "Failed to update post");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add this function to toggle expanded state for posts
+  const toggleExpandPost = (postId: string) => {
+    setExpandedPosts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
+
   // Calculate total likes and comments
   const totalLikes = posts.reduce(
     (sum, post) => sum + (post.like_count || 0),
@@ -249,9 +291,33 @@ export default function ProfileTab() {
         </Pressable>
       </View>
 
-      <Text className="text-gray-800 mb-4 leading-6 text-base">
-        {item.content}
-      </Text>
+      {(() => {
+        const MAX_LENGTH = 200;
+        const isExpanded = expandedPosts.has(item.id);
+        const shouldTruncate = item.content.length > MAX_LENGTH && !isExpanded;
+        const displayContent = shouldTruncate
+          ? item.content.slice(0, MAX_LENGTH) + "..."
+          : item.content;
+        return (
+          <Text className="text-gray-800 mb-4 leading-6 text-base">
+            {displayContent}
+            {shouldTruncate && (
+              <Text
+                className="text-blue-500 font-medium"
+                onPress={() => toggleExpandPost(item.id)}>
+                {" Read More"}
+              </Text>
+            )}
+            {isExpanded && item.content.length > MAX_LENGTH && (
+              <Text
+                className="text-blue-500 font-medium"
+                onPress={() => toggleExpandPost(item.id)}>
+                {" Show Less"}
+              </Text>
+            )}
+          </Text>
+        );
+      })()}
 
       <View className="flex-row justify-between items-center pt-4 border-t border-gray-100">
         <View className="flex-row items-center bg-red-50 px-3 py-2 rounded-full">
@@ -304,15 +370,18 @@ export default function ProfileTab() {
           </Text>
           <View className="flex-row space-x-4 gap-3">
             <Pressable
-              className="bg-purple-500 bg-opacity-20 backdrop-blur-sm rounded-full px-6 py-3 "
+              className="bg-purple-500 bg-opacity-20 rounded-full px-6 py-3 "
               onPress={() => setShowEditModal(true)}>
-              <Text className="text-white font-bold">Edit Profile</Text>
+              <Text className="text-white font-bold">
+                <Feather name="edit-2" size={16} color="white" /> Edit Profile
+              </Text>
             </Pressable>
             <Pressable
               className={`${loading ? "bg-gray-500" : "bg-red-500 bg-opacity-90"} rounded-full px-6 py-3`}
               onPress={handleLogout}
               disabled={loading}>
               <Text className="text-white font-bold">
+                <Feather name="log-out" size={16} color="white" />{" "}
                 {loading ? "Logging out..." : "Logout"}
               </Text>
             </Pressable>
@@ -335,12 +404,7 @@ export default function ProfileTab() {
             </Text>
             <Text className="text-gray-500 font-medium">Likes</Text>
           </View>
-          <View className="items-center">
-            <Text className="text-2xl font-bold text-green-500">
-              {friends.length}
-            </Text>
-            <Text className="text-gray-500 font-medium">Friends</Text>
-          </View>
+
           <View className="items-center">
             <Text className="text-2xl font-bold text-purple-500">
               {totalComments}
@@ -409,7 +473,7 @@ export default function ProfileTab() {
       {/* Friends Modal */}
       <Modal
         visible={showFriendsModal}
-        animationType="slide"
+        animationType="none"
         transparent={true}
         onRequestClose={() => setShowFriendsModal(false)}>
         <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
@@ -494,30 +558,47 @@ export default function ProfileTab() {
       <Modal
         visible={showPostMenu}
         transparent={true}
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setShowPostMenu(false)}>
         <Pressable
           className="flex-1 bg-black bg-opacity-50"
           onPress={() => setShowPostMenu(false)}>
           <View className="flex-1 justify-center items-center">
-            <View className="bg-white rounded-2xl p-4 mx-6  min-w-[200px]">
+            <View className="bg-white rounded-2xl p-4 mx-6  min-w-[300px]">
               <Text className="text-lg font-bold text-gray-900 mb-4 text-center">
                 Post Options
               </Text>
+
+              <Pressable
+                className="flex-row items-center p-3 rounded-xl bg-blue-50 mb-2"
+                onPress={() =>
+                  selectedPostId && openEditPostModal(selectedPostId)
+                }>
+                <Feather
+                  name="edit-2"
+                  size={20}
+                  className="text-blue-600 mr-3"
+                />
+                <Text className="text-blue-600 font-semibold">Edit Post</Text>
+              </Pressable>
 
               <Pressable
                 className="flex-row items-center p-3 rounded-xl bg-red-50 mb-2"
                 onPress={() =>
                   selectedPostId && handleDeletePost(selectedPostId)
                 }>
-                <Text className="text-red-600 mr-3">🗑️</Text>
+                <Feather
+                  name="trash-2"
+                  size={20}
+                  className="text-red-600 mr-3"
+                />
                 <Text className="text-red-600 font-semibold">Delete Post</Text>
               </Pressable>
 
               <Pressable
-                className="flex-row items-center p-3 rounded-xl bg-gray-50"
+                className="flex-row items-center p-3 rounded-xl bg-gray-100"
                 onPress={() => setShowPostMenu(false)}>
-                <Text className="text-gray-600 mr-3">✕</Text>
+                <Feather name="x" size={20} className="text-gray-600 mr-3" />
                 <Text className="text-gray-600 font-semibold">Cancel</Text>
               </Pressable>
             </View>
@@ -526,13 +607,13 @@ export default function ProfileTab() {
       </Modal>
 
       {/* Edit Profile Modal */}
-      <Modal visible={showEditModal} transparent animationType="slide">
+      <Modal visible={showEditModal} transparent animationType="none">
         <View className="flex-1 justify-end bg-black/60">
-          <View className="bg-white rounded-t-3xl p-6 ">
+          <View className="bg-white  p-6  h-screen">
             <View className="w-12 h-1.5 bg-gray-300 rounded-full self-center mb-8" />
 
             <Text className="text-2xl font-bold mb-8 text-gray-900">
-              ✏️ Edit Profile
+              <Feather name="edit" size={20} /> Edit Profile
             </Text>
 
             <View className="space-y-4 mb-8 gap-3">
@@ -605,7 +686,83 @@ export default function ProfileTab() {
                 onPress={handleUpdateProfile}
                 disabled={loading}>
                 <Text className="text-white text-center font-bold text-lg">
-                  {loading ? "⏳ Updating..." : "✨ Update"}
+                  {" "}
+                  <AntDesign name="check" size={20} color="white" />{" "}
+                  {loading ? "Updating..." : "Update"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowLogoutModal(false)}>
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-40">
+          <View className="bg-white rounded-2xl p-8 w-11/12 max-w-md items-center">
+            <Text className="text-xl font-bold text-gray-900 mb-4">Logout</Text>
+            <Text className="text-gray-700 mb-8 text-center">
+              Are you sure you want to logout?
+            </Text>
+            <View className="flex-row w-full justify-between">
+              <Pressable
+                className="flex-1 bg-gray-200 rounded-xl py-3 mr-2"
+                onPress={() => setShowLogoutModal(false)}>
+                <Text className="text-gray-700 text-center font-bold text-lg">
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                className="flex-1 bg-red-500 rounded-xl py-3 ml-2"
+                onPress={confirmLogout}>
+                <Text className="text-white text-center font-bold text-lg">
+                  Logout
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Post Modal */}
+      <Modal
+        visible={showEditPostModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowEditPostModal(false)}>
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-40">
+          <View className="bg-white rounded-2xl p-6 w-11/12 max-w-lg">
+            <Text className="text-xl font-bold text-gray-900 mb-4">
+              Edit Post
+            </Text>
+            <TextInput
+              className="border-2 border-gray-200 rounded-2xl p-4 text-base mb-4 min-h-24 max-h-56"
+              placeholder="Edit your post..."
+              value={editPostContent}
+              onChangeText={setEditPostContent}
+              multiline
+              textAlignVertical="top"
+              maxLength={1000}
+              autoFocus
+            />
+            <View className="flex-row space-x-4 mt-2">
+              <Pressable
+                className="flex-1 bg-gray-100 rounded-2xl py-3"
+                onPress={() => setShowEditPostModal(false)}>
+                <Text className="text-gray-700 text-center font-bold text-lg">
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                className={`flex-1 rounded-2xl py-3 ${editPostContent.trim() ? "bg-blue-500" : "bg-gray-300"}`}
+                onPress={handleEditPost}
+                disabled={!editPostContent.trim() || loading}>
+                <Text className="text-white text-center font-bold text-lg">
+                  {loading ? "Updating..." : "Save"}
                 </Text>
               </Pressable>
             </View>

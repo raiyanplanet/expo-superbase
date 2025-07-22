@@ -1,23 +1,51 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
-import { messagesApi } from "../../lib/api";
+import {
+  commentsApi,
+  friendsApi,
+  likesApi,
+  messagesApi,
+  postsApi,
+} from "../../lib/api";
 import { supabase } from "../../supabase/client";
 
-function ChatTabIcon({ color, focused, size }: { color: string; focused: boolean; size: number }) {
+const NOTIF_LAST_SEEN_KEY = "notifications_last_seen";
+
+async function getNotificationsLastSeen() {
+  const ts = await AsyncStorage.getItem(NOTIF_LAST_SEEN_KEY);
+  return ts ? new Date(ts) : new Date(0);
+}
+
+async function setNotificationsLastSeen() {
+  await AsyncStorage.setItem(NOTIF_LAST_SEEN_KEY, new Date().toISOString());
+}
+
+function ChatTabIcon({
+  color,
+  focused,
+  size,
+}: {
+  color: string;
+  focused: boolean;
+  size: number;
+}) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const loadUnreadCount = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
           const count = await messagesApi.getUnreadCount(user.id);
           setUnreadCount(count);
         }
       } catch (error) {
-        console.error('Error loading unread count:', error);
+        console.error("Error loading unread count:", error);
       }
     };
 
@@ -29,32 +57,131 @@ function ChatTabIcon({ color, focused, size }: { color: string; focused: boolean
   }, []);
 
   return (
-    <View style={{ position: 'relative' }}>
+    <View style={{ position: "relative" }}>
       <Ionicons
         name={focused ? "chatbubbles" : "chatbubbles-outline"}
         size={size}
         color={color}
       />
       {unreadCount > 0 && (
-        <View style={{
-          position: 'absolute',
-          top: -5,
-          right: -5,
-          backgroundColor: '#ef4444',
-          borderRadius: 10,
-          minWidth: 20,
-          height: 20,
-          justifyContent: 'center',
-          alignItems: 'center',
-          borderWidth: 2,
-          borderColor: '#ffffff'
-        }}>
-          <Text style={{
-            color: '#ffffff',
-            fontSize: 10,
-            fontWeight: 'bold'
+        <View
+          style={{
+            position: "absolute",
+            top: -5,
+            right: -5,
+            backgroundColor: "#ef4444",
+            borderRadius: 10,
+            minWidth: 20,
+            height: 20,
+            justifyContent: "center",
+            alignItems: "center",
+            borderWidth: 2,
+            borderColor: "#ffffff",
           }}>
-            {unreadCount > 99 ? '99+' : unreadCount}
+          <Text
+            style={{
+              color: "#ffffff",
+              fontSize: 10,
+              fontWeight: "bold",
+            }}>
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function NotificationTabIcon({
+  color,
+  focused,
+  size,
+}: {
+  color: string;
+  focused: boolean;
+  size: number;
+}) {
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [lastSeen, setLastSeen] = useState<Date>(new Date(0));
+
+  useEffect(() => {
+    const loadNotificationCount = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          setNotificationCount(0);
+          return;
+        }
+        const lastSeenTime = await getNotificationsLastSeen();
+        setLastSeen(lastSeenTime);
+        let notifications: { created_at: string }[] = [];
+        // Friend requests (these are included in the badge count)
+        const friendRequests = await friendsApi.getFriendRequests(user.id);
+        notifications = notifications.concat(
+          friendRequests.map((r) => ({ created_at: r.created_at }))
+        );
+        // Likes and comments on user's posts
+        const userPosts = await postsApi.getUserPosts(user.id);
+        for (const post of userPosts) {
+          const likes = await likesApi.getPostLikes(post.id);
+          notifications = notifications.concat(
+            likes
+              .filter((like) => like.user_id !== user.id)
+              .map((like) => ({ created_at: like.created_at }))
+          );
+          const comments = await commentsApi.getPostComments(post.id);
+          notifications = notifications.concat(
+            comments
+              .filter((comment) => comment.user_id !== user.id)
+              .map((comment) => ({ created_at: comment.created_at }))
+          );
+        }
+        // Only count notifications newer than lastSeenTime
+        const unseenCount = notifications.filter(
+          (n) => new Date(n.created_at) > lastSeenTime
+        ).length;
+        setNotificationCount(unseenCount);
+      } catch (error) {
+        console.error("Error loading notification count:", error);
+        setNotificationCount(0);
+      }
+    };
+    loadNotificationCount();
+    const interval = setInterval(loadNotificationCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <View style={{ position: "relative" }}>
+      <Ionicons
+        name={focused ? "notifications" : "notifications-outline"}
+        size={size}
+        color={color}
+      />
+      {notificationCount > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            top: -5,
+            right: -5,
+            backgroundColor: "#ef4444",
+            borderRadius: 10,
+            minWidth: 20,
+            height: 20,
+            justifyContent: "center",
+            alignItems: "center",
+            borderWidth: 2,
+            borderColor: "#ffffff",
+          }}>
+          <Text
+            style={{
+              color: "#ffffff",
+              fontSize: 10,
+              fontWeight: "bold",
+            }}>
+            {notificationCount > 99 ? "99+" : notificationCount}
           </Text>
         </View>
       )}
@@ -101,7 +228,7 @@ export default function TabLayout() {
               color={color}
             />
           ),
-          headerTitle: "🏠 Home Feed",
+          headerTitle: "🏠 Feed",
         }}
         listeners={{
           tabPress: (e) => {
@@ -143,13 +270,14 @@ export default function TabLayout() {
         options={{
           title: "Notifications",
           tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons
-              name={focused ? "notifications" : "notifications-outline"}
-              size={size}
-              color={color}
-            />
+            <NotificationTabIcon color={color} focused={focused} size={size} />
           ),
           headerTitle: "🔔 Notifications",
+        }}
+        listeners={{
+          tabPress: async () => {
+            await setNotificationsLastSeen();
+          },
         }}
       />
       <Tabs.Screen

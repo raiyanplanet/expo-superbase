@@ -1,4 +1,5 @@
 "use client";
+import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -10,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { friendsApi, messagesApi, postsApi, profileApi } from "../../lib/api";
 import { Post, Profile } from "../../lib/types";
 import { supabase } from "../../supabase/client";
@@ -21,12 +23,15 @@ export default function UserDetails() {
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [friendStatus, setFriendStatus] = useState<'none' | 'friends' | 'pending' | 'sent'>('none');
+  const [friendStatus, setFriendStatus] = useState<
+    "none" | "friends" | "pending" | "sent"
+  >("none");
   const [friendId, setFriendId] = useState<string | null>(null);
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set()); // Track expanded posts
 
   const loadUserData = useCallback(async () => {
     if (!id) return;
-    
+
     try {
       setLoading(true);
       const { data } = await supabase.auth.getUser();
@@ -34,7 +39,7 @@ export default function UserDetails() {
         router.replace("/login");
         return;
       }
-      
+
       setCurrentUser(data.user);
       await Promise.all([
         loadUserProfile(id),
@@ -82,20 +87,29 @@ export default function UserDetails() {
     }
   };
 
-  const checkFriendStatus = async (currentUserId: string, targetUserId: string) => {
+  const checkFriendStatus = async (
+    currentUserId: string,
+    targetUserId: string
+  ) => {
     try {
       // Check if they are friends
       const friends = await friendsApi.getFriends(currentUserId);
-      const isFriend = friends.some(friend => 
-        (friend.requester_id === targetUserId && friend.addressee_id === currentUserId) ||
-        (friend.requester_id === currentUserId && friend.addressee_id === targetUserId)
+      const isFriend = friends.some(
+        (friend) =>
+          (friend.requester_id === targetUserId &&
+            friend.addressee_id === currentUserId) ||
+          (friend.requester_id === currentUserId &&
+            friend.addressee_id === targetUserId)
       );
-      
+
       if (isFriend) {
-        setFriendStatus('friends');
-        const friend = friends.find(friend => 
-          (friend.requester_id === targetUserId && friend.addressee_id === currentUserId) ||
-          (friend.requester_id === currentUserId && friend.addressee_id === targetUserId)
+        setFriendStatus("friends");
+        const friend = friends.find(
+          (friend) =>
+            (friend.requester_id === targetUserId &&
+              friend.addressee_id === currentUserId) ||
+            (friend.requester_id === currentUserId &&
+              friend.addressee_id === targetUserId)
         );
         if (friend) setFriendId(friend.id);
         return;
@@ -103,23 +117,27 @@ export default function UserDetails() {
 
       // Check if there's a pending request from them
       const requests = await friendsApi.getFriendRequests(currentUserId);
-      const pendingRequest = requests.find(request => request.requester_id === targetUserId);
+      const pendingRequest = requests.find(
+        (request) => request.requester_id === targetUserId
+      );
       if (pendingRequest) {
-        setFriendStatus('pending');
+        setFriendStatus("pending");
         setFriendId(pendingRequest.id);
         return;
       }
 
       // Check if we sent them a request
       const sentRequests = await friendsApi.getFriendRequests(targetUserId);
-      const sentRequest = sentRequests.find(request => request.requester_id === currentUserId);
+      const sentRequest = sentRequests.find(
+        (request) => request.requester_id === currentUserId
+      );
       if (sentRequest) {
-        setFriendStatus('sent');
+        setFriendStatus("sent");
         setFriendId(sentRequest.id);
         return;
       }
 
-      setFriendStatus('none');
+      setFriendStatus("none");
     } catch (error) {
       console.error("Error checking friend status:", error);
     }
@@ -133,10 +151,12 @@ export default function UserDetails() {
 
   const handleSendFriendRequest = async () => {
     if (!currentUser || !userProfile) return;
-    
+
     try {
-      await friendsApi.sendFriendRequest(currentUser.id, { addressee_id: userProfile.id });
-      setFriendStatus('sent');
+      await friendsApi.sendFriendRequest(currentUser.id, {
+        addressee_id: userProfile.id,
+      });
+      setFriendStatus("sent");
       Alert.alert("Success", "Friend request sent!");
     } catch (error) {
       console.error("Error sending friend request:", error);
@@ -146,10 +166,10 @@ export default function UserDetails() {
 
   const handleAcceptRequest = async () => {
     if (!friendId) return;
-    
+
     try {
       await friendsApi.acceptFriendRequest(friendId);
-      setFriendStatus('friends');
+      setFriendStatus("friends");
       Alert.alert("Success", "Friend request accepted!");
     } catch (error) {
       console.error("Error accepting friend request:", error);
@@ -159,10 +179,10 @@ export default function UserDetails() {
 
   const handleRejectRequest = async () => {
     if (!friendId) return;
-    
+
     try {
       await friendsApi.rejectFriendRequest(friendId);
-      setFriendStatus('none');
+      setFriendStatus("none");
       setFriendId(null);
       Alert.alert("Success", "Friend request rejected");
     } catch (error) {
@@ -173,7 +193,7 @@ export default function UserDetails() {
 
   const handleRemoveFriend = async () => {
     if (!friendId) return;
-    
+
     Alert.alert(
       "Remove Friend",
       "Are you sure you want to remove this friend?",
@@ -185,7 +205,7 @@ export default function UserDetails() {
           onPress: async () => {
             try {
               await friendsApi.removeFriend(friendId);
-              setFriendStatus('none');
+              setFriendStatus("none");
               setFriendId(null);
               Alert.alert("Success", "Friend removed");
             } catch (error) {
@@ -196,6 +216,19 @@ export default function UserDetails() {
         },
       ]
     );
+  };
+
+  // Add this function to toggle expanded state for posts
+  const toggleExpandPost = (postId: string) => {
+    setExpandedPosts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
   };
 
   const renderPost = ({ item }: { item: Post }) => (
@@ -221,9 +254,33 @@ export default function UserDetails() {
         </View>
       </View>
 
-      <Text className="text-gray-800 mb-4 leading-6 text-base">
-        {item.content}
-      </Text>
+      {(() => {
+        const MAX_LENGTH = 200;
+        const isExpanded = expandedPosts.has(item.id);
+        const shouldTruncate = item.content.length > MAX_LENGTH && !isExpanded;
+        const displayContent = shouldTruncate
+          ? item.content.slice(0, MAX_LENGTH) + "..."
+          : item.content;
+        return (
+          <Text className="text-gray-800 mb-4 leading-6 text-base">
+            {displayContent}
+            {shouldTruncate && (
+              <Text
+                className="text-blue-500 font-medium"
+                onPress={() => toggleExpandPost(item.id)}>
+                {" Read More"}
+              </Text>
+            )}
+            {isExpanded && item.content.length > MAX_LENGTH && (
+              <Text
+                className="text-blue-500 font-medium"
+                onPress={() => toggleExpandPost(item.id)}>
+                {" Show Less"}
+              </Text>
+            )}
+          </Text>
+        );
+      })()}
 
       <View className="flex-row justify-between items-center pt-4 border-t border-gray-100">
         <View className="flex-row items-center bg-red-50 px-3 py-2 rounded-full">
@@ -251,167 +308,207 @@ export default function UserDetails() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6' }}>
-        <Text style={{ fontSize: 16, color: '#6b7280' }}>Loading profile...</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#f3f4f6",
+        }}>
+        <Text style={{ fontSize: 16, color: "#6b7280" }}>
+          Loading profile...
+        </Text>
       </View>
     );
   }
 
   if (!userProfile) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6' }}>
-        <Text style={{ fontSize: 16, color: '#6b7280' }}>User not found</Text>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#f3f4f6",
+        }}>
+        <Text style={{ fontSize: 16, color: "#6b7280" }}>User not found</Text>
         <Pressable
-          style={{ backgroundColor: '#3b82f6', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginTop: 20 }}
+          style={{
+            backgroundColor: "#3b82f6",
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 8,
+            marginTop: 20,
+          }}
           onPress={() => router.back()}>
-          <Text style={{ color: 'white', fontWeight: '600' }}>Go Back</Text>
+          <Text style={{ color: "white", fontWeight: "600" }}>Go Back</Text>
         </Pressable>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-gradient-to-br from-gray-50 to-blue-50"
-      contentContainerStyle={{ flexGrow: 1 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }>
-      {/* Header with Back Button */}
-      <View className="bg-gradient-to-br from-blue-600 to-purple-700 pt-12 pb-4 px-4 relative">
-        <View className="flex-row items-center mb-4">
-          <Pressable
-            className="w-10 h-10 rounded-full bg-white bg-opacity-20 flex items-center justify-center mr-3"
-            onPress={() => router.back()}>
-            <Text className=" font-bold text-lg">←</Text>
-          </Pressable>
-          <Text className=" font-bold text-lg">Profile</Text>
-        </View>
-      </View>
-
-      {/* Profile Header */}
-      <View className="bg-gradient-to-br from-blue-600 to-purple-700 pb-8 px-6 relative">
-        <View className="items-center relative z-10">
-          <View className="w-28 h-28 rounded-full bg-purple-500  flex items-center justify-center mb-4 border border-white">
-            <Text className="text-5xl font-bold text-white">
-              {userProfile.username?.charAt(0).toUpperCase() || "U"}
-            </Text>
-          </View>
-          <Text className="text-3xl font-bold mb-2 text-center ">
-            {userProfile.full_name || userProfile.username || "Unknown User"}
-          </Text>
-          {userProfile.bio ? (
-            <Text className="text-base  text-center mb-2 px-2">
-              {userProfile.bio}
-            </Text>
-          ) : null}
-
-          {/* Friend Action Button */}
-          <View className="flex-row space-x-4 gap-3">
-            {friendStatus === 'none' && (
-              <Pressable
-                className="bg-blue-500 rounded-full px-6 py-3 "
-                onPress={handleSendFriendRequest}>
-                <Text className="text-white font-bold">👥 Add Friend</Text>
-              </Pressable>
-            )}
-            
-            {friendStatus === 'pending' && (
-              <View className="flex-row space-x-2">
-                <Pressable
-                  className="bg-green-500 rounded-full px-4 py-3 "
-                  onPress={handleAcceptRequest}>
-                  <Text className="text-white font-bold">✓ Accept</Text>
-                </Pressable>
-                <Pressable
-                  className="bg-red-500 rounded-full px-4 py-3 "
-                  onPress={handleRejectRequest}>
-                  <Text className="text-white font-bold">✕ Reject</Text>
-                </Pressable>
-              </View>
-            )}
-            
-            {friendStatus === 'sent' && (
-              <Pressable
-                className="bg-gray-500 rounded-full px-6 py-3 "
-                disabled>
-                <Text className="text-white font-bold">⏳ Request Sent</Text>
-              </Pressable>
-            )}
-            
-            {friendStatus === 'friends' && (
-              <View className="flex-row space-x-3 gap-3">
-                <Pressable
-                  className="bg-purple-500 rounded-full px-6 py-3 "
-                  onPress={() => {
-                    if (userProfile?.id) {
-                      router.push(`/chat/${userProfile.id}` as any);
-                    }
-                  }}>
-                  <Text className="text-white font-bold">💬 Chat</Text>
-                </Pressable>
-                <Pressable
-                  className="bg-red-500 rounded-full px-6 py-3 "
-                  onPress={handleRemoveFriend}>
-                  <Text className="text-white font-bold">UnFriend</Text>
-                </Pressable>
-              </View>
-            )}
+    <SafeAreaView className="flex-1 bg-gray-100">
+      <ScrollView
+        className="flex-1 bg-blue-50"
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }>
+        {/* Header with Back Button */}
+        <View className="px-4 relative py-4">
+          <View className="flex-row items-center mb-4">
+            <Pressable
+              className="w-10 h-10 rounded-full bg-white bg-opacity-20 flex items-center justify-center mr-3"
+              onPress={() => router.back()}>
+              <Text className=" font-bold text-lg">←</Text>
+            </Pressable>
+            <Text className=" font-bold text-lg">Profile</Text>
           </View>
         </View>
-      </View>
 
-      {/* Stats Section */}
-      <View className="bg-white mx-4 -mt-6 rounded-2xl  p-6 relative z-20 border border-gray-100">
-        <View className="flex-row justify-around">
-          <View className="items-center">
-            <Text className="text-2xl font-bold text-blue-600">
-              {userPosts.length}
-            </Text>
-            <Text className="text-gray-500 font-medium">Posts</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-2xl font-bold text-red-500">
-              {userPosts.reduce((sum, post) => sum + (post.like_count || 0), 0)}
-            </Text>
-            <Text className="text-gray-500 font-medium">Likes</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-2xl font-bold text-green-500">
-              {userPosts.reduce((sum, post) => sum + (post.comment_count || 0), 0)}
-            </Text>
-            <Text className="text-gray-500 font-medium">Comments</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Posts Section */}
-      <View className="mx-4 mt-4">
-        <View className="bg-white rounded-2xl p-4 mb-4 border border-gray-100">
-          <Text className="text-xl font-bold text-gray-900">📝 Posts</Text>
-        </View>
-        <FlatList
-          data={userPosts}
-          renderItem={renderPost}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={false}
-          ListEmptyComponent={
-            <View className="bg-white rounded-2xl p-12 items-center border border-gray-100">
-              <Text className="text-6xl mb-4">📱</Text>
-              <Text className="text-gray-500 text-xl font-semibold text-center mb-2">
-                No posts yet
-              </Text>
-              <Text className="text-gray-400 text-center leading-6">
-                This user hasn&apos;t shared any posts yet.
+        {/* Profile Header */}
+        <View className="bg-gradient-to-br from-blue-600 to-purple-700 pb-8 px-6 relative">
+          <View className="items-center relative z-10">
+            <View className="w-28 h-28 rounded-full bg-purple-500  flex items-center justify-center mb-4 border border-white">
+              <Text className="text-5xl font-bold text-white">
+                {userProfile.username?.charAt(0).toUpperCase() || "U"}
               </Text>
             </View>
-          }
-        />
-      </View>
+            <Text className="text-3xl font-bold mb-2 text-center ">
+              {userProfile.full_name || userProfile.username || "Unknown User"}
+            </Text>
+            {userProfile.bio ? (
+              <Text className="text-base  text-center mb-2 px-2">
+                {userProfile.bio}
+              </Text>
+            ) : null}
 
-      <View className="h-6" />
-    </ScrollView>
+            {/* Friend Action Button */}
+            <View className="flex-row space-x-4 gap-3">
+              {friendStatus === "none" && (
+                <Pressable
+                  className="bg-blue-500 rounded-xl px-8 py-3 "
+                  onPress={handleSendFriendRequest}>
+                  <Text className="text-white font-bold">
+                    <Feather name="user-plus" size={16} /> Add Friend
+                  </Text>
+                </Pressable>
+              )}
+
+              {friendStatus === "pending" && (
+                <View className="flex-row space-x-2 gap-3">
+                  <Pressable
+                    className="bg-gray-500 rounded-xl px-8 py-3 "
+                    onPress={handleAcceptRequest}>
+                    <Text className="text-white font-bold">
+                      <Feather name="user-check" size={16} /> Accept
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    className="bg-red-500 rounded-xl px-8 py-3 "
+                    onPress={handleRejectRequest}>
+                    <Text className="text-white font-bold">
+                      <Feather name="user-x" size={16} /> Reject
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {friendStatus === "sent" && (
+                <Pressable
+                  className="bg-gray-500 rounded-xl px-8 py-3 "
+                  disabled>
+                  <Text className="text-white font-bold">
+                    <Feather name="clock" size={16} /> Request Sent
+                  </Text>
+                </Pressable>
+              )}
+
+              {friendStatus === "friends" && (
+                <View className="flex-row space-x-3 gap-3">
+                  <Pressable
+                    className="bg-purple-500 rounded-xl px-8 py-3 "
+                    onPress={() => {
+                      if (userProfile?.id) {
+                        router.push(`/chat/${userProfile.id}` as any);
+                      }
+                    }}>
+                    <Text className="text-white font-bold">
+                      <Feather name="message-circle" size={16} /> Chat
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    className="bg-red-500 rounded-xl px-8 py-3 "
+                    onPress={handleRemoveFriend}>
+                    <Text className="text-white font-bold">
+                      <Feather name="user-x" size={16} /> UnFriend
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Stats Section */}
+        <View className="bg-white mx-4 -mt-6 rounded-2xl  p-6 relative z-20 border border-gray-100">
+          <View className="flex-row justify-around">
+            <View className="items-center">
+              <Text className="text-2xl font-bold text-blue-600">
+                {userPosts.length}
+              </Text>
+              <Text className="text-gray-500 font-medium">Posts</Text>
+            </View>
+            <View className="items-center">
+              <Text className="text-2xl font-bold text-red-500">
+                {userPosts.reduce(
+                  (sum, post) => sum + (post.like_count || 0),
+                  0
+                )}
+              </Text>
+              <Text className="text-gray-500 font-medium">Likes</Text>
+            </View>
+            <View className="items-center">
+              <Text className="text-2xl font-bold text-green-500">
+                {userPosts.reduce(
+                  (sum, post) => sum + (post.comment_count || 0),
+                  0
+                )}
+              </Text>
+              <Text className="text-gray-500 font-medium">Comments</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Posts Section */}
+        <View className="mx-4 mt-4">
+          <View className="bg-white rounded-2xl p-4 mb-4 border border-gray-100">
+            <Text className="text-xl font-bold text-gray-900">📝 Posts</Text>
+          </View>
+          <FlatList
+            data={userPosts}
+            renderItem={renderPost}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
+            ListEmptyComponent={
+              <View className="bg-white rounded-2xl p-12 items-center border border-gray-100">
+                <Text className="text-6xl mb-4">📱</Text>
+                <Text className="text-gray-500 text-xl font-semibold text-center mb-2">
+                  No posts yet
+                </Text>
+                <Text className="text-gray-400 text-center leading-6">
+                  This user hasn&apos;t shared any posts yet.
+                </Text>
+              </View>
+            }
+          />
+        </View>
+
+        <View className="h-6" />
+      </ScrollView>
+    </SafeAreaView>
   );
-} 
+}

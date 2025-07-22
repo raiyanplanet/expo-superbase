@@ -3,21 +3,22 @@ import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Keyboard,
-    Platform,
-    Pressable,
-    RefreshControl,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { messagesApi, profileApi } from "../../lib/api";
 import { Message, Profile } from "../../lib/types";
 import { supabase } from "../../supabase/client";
-import { chatEventBus } from '../event-bus';
+import { chatEventBus } from "../event-bus";
 
 // Custom hook for keyboard handling
 const useKeyboardHeight = () => {
@@ -212,7 +213,7 @@ const MessageInput = ({
         <View className="flex-row items-end">
           <TextInput
             ref={inputRef}
-            className="flex-1 border border-gray-300 bg-gray-50 rounded-full px-4 py-3 mr-3 text-base"
+            className="flex-1 border border-gray-300 bg-gray-50 rounded-2xl px-4 py-3 mr-3 text-base"
             placeholder="Type a message..."
             placeholderTextColor="#9CA3AF"
             value={value}
@@ -222,7 +223,7 @@ const MessageInput = ({
             textAlignVertical="top"
             style={{
               minHeight: 44,
-              maxHeight: 120,
+              maxHeight: 200,
               lineHeight: 20,
             }}
           />
@@ -416,8 +417,8 @@ export default function ChatRoom() {
       );
 
       // Emit event to update chat list
-      chatEventBus.emit('refreshChatList');
-      console.log('chatEventBus: refreshChatList emitted');
+      chatEventBus.emit("refreshChatList");
+      console.log("chatEventBus: refreshChatList emitted");
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message");
@@ -443,12 +444,15 @@ export default function ChatRoom() {
   // Subscribe to global incoming messages for auto-refresh
   useEffect(() => {
     if (!user) return;
-    const globalSub = messagesApi.subscribeToIncomingMessages(user.id, (message) => {
-      if (message.sender_id === friendId) {
-        // New message from the current chat friend, refresh chat
-        loadFriendAndMessages(user.id, true);
+    const globalSub = messagesApi.subscribeToIncomingMessages(
+      user.id,
+      (message) => {
+        if (message.sender_id === friendId) {
+          // New message from the current chat friend, refresh chat
+          loadFriendAndMessages(user.id, true);
+        }
       }
-    });
+    );
     return () => {
       globalSub.unsubscribe();
     };
@@ -492,14 +496,12 @@ export default function ChatRoom() {
         <ChatHeader friend={friend} onBackPress={() => router.back()} />
       )}
 
-      {/* Entire chat content moves up when keyboard opens */}
-      <View
-        className="flex-1"
-        style={{
-          marginBottom: keyboardHeight, // Push entire content up when keyboard opens
-        }}>
-        {/* Messages Container */}
-        <View className="flex-1">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={isKeyboardVisible ? 56 : 0} // 56 = header height
+      >
+        <View style={{ flex: 1 }}>
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -508,7 +510,7 @@ export default function ChatRoom() {
             contentContainerStyle={{
               padding: 16,
               flexGrow: 1,
-              paddingBottom: 16, // Just normal padding
+              paddingBottom: 16,
             }}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => {
@@ -538,18 +540,18 @@ export default function ChatRoom() {
               autoscrollToTopThreshold: 10,
             }}
           />
+          {/* Message Input - always at bottom, above keyboard */}
+          <View>
+            <MessageInput
+              value={newMessage}
+              onChangeText={setNewMessage}
+              onSend={sendMessage}
+              sending={sending}
+              disabled={!friend}
+            />
+          </View>
         </View>
-
-        {/* Input - Always at bottom of the chat content */}
-        <MessageInput
-          value={newMessage}
-          onChangeText={setNewMessage}
-          onSend={sendMessage}
-          sending={sending}
-          disabled={!friend}
-        />
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
