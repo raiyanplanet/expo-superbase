@@ -1,5 +1,5 @@
 "use client";
-import { Feather } from "@expo/vector-icons";
+import { AntDesign, Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -243,6 +243,7 @@ export default function UserDetails() {
           <Text className="font-bold text-gray-900 text-base">
             {item.full_name || item.username || "Unknown User"}
           </Text>
+
           <Text className="text-gray-500 text-sm">
             {new Date(item.created_at).toLocaleDateString("en-US", {
               month: "short",
@@ -262,7 +263,7 @@ export default function UserDetails() {
           ? item.content.slice(0, MAX_LENGTH) + "..."
           : item.content;
         return (
-          <Text className="text-gray-800 mb-4 leading-6 text-base">
+          <Text className="text-gray-800 mb-4 leading-6 text-xl">
             {displayContent}
             {shouldTruncate && (
               <Text
@@ -283,22 +284,25 @@ export default function UserDetails() {
       })()}
 
       <View className="flex-row justify-between items-center pt-4 border-t border-gray-100">
-        <View className="flex-row items-center bg-red-50 px-3 py-2 rounded-full">
-          <Text className="text-red-500 mr-2">❤️</Text>
-          <Text className="text-red-600 font-semibold">
-            {item.like_count || 0}
-          </Text>
+        <View className="flex-1 flex-row items-center justify-center  px-3 py-3 rounded-full mx-1   bg-blue-50">
+          <AntDesign name="hearto" size={20} color="black" className="mr-2" />
+          <Text className="text-md text-gray-500">{item.like_count || 0}</Text>
         </View>
 
-        <View className="flex-row items-center bg-blue-50 px-3 py-2 rounded-full">
-          <Text className="text-blue-500 mr-2">💬</Text>
+        <View className="flex-1 flex-row items-center justify-center  px-3 py-3 rounded-full mx-1   bg-blue-50">
+          <AntDesign
+            name="message1"
+            size={16}
+            color="#3B82F6"
+            className="mr-2"
+          />
           <Text className="text-blue-600 font-semibold">
             {item.comment_count || 0}
           </Text>
         </View>
 
         <Pressable
-          className="bg-purple-600 px-4 py-2 rounded-full "
+          className="bg-purple-600 px-4 py-3 rounded-full "
           onPress={() => router.push(`/post/${item.id}` as any)}>
           <Text className="text-white font-semibold text-sm">View Post</Text>
         </Pressable>
@@ -378,6 +382,17 @@ export default function UserDetails() {
             </View>
             <Text className="text-3xl font-bold mb-2 text-center ">
               {userProfile.full_name || userProfile.username || "Unknown User"}
+            </Text>
+            <Text className="text-gray-600 text-base mb-4">
+              @{userProfile.username}
+            </Text>
+            <Text className="text-gray-600 text-base mb-4">
+              Joined{" "}
+              {new Date(userProfile.created_at).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
             </Text>
             {userProfile.bio ? (
               <Text className="text-base  text-center mb-2 px-2">
@@ -495,7 +510,7 @@ export default function UserDetails() {
             scrollEnabled={false}
             ListEmptyComponent={
               <View className="bg-white rounded-2xl p-12 items-center border border-gray-100">
-                <Text className="text-6xl mb-4">📱</Text>
+                <AntDesign name="filetext1" size={50} color="#9CA3AF" />
                 <Text className="text-gray-500 text-xl font-semibold text-center mb-2">
                   No posts yet
                 </Text>

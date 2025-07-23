@@ -10,10 +10,9 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-
   Text,
   TextInput,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { commentsApi, likesApi } from "../../lib/api";
@@ -332,9 +331,12 @@ export default function PostDetail() {
   };
 
   const handleInputFocus = () => {
-    setTimeout(() => {
+    setTimeout(
+      () => {
         flatListRef.current?.scrollToEnd({ animated: true });
-    }, Platform.OS === "ios" ? 300 : 500);
+      },
+      Platform.OS === "ios" ? 300 : 500
+    );
   };
 
   const renderHeader = () => {
@@ -389,7 +391,7 @@ export default function PostDetail() {
           <View className="border-t border-gray-100 pt-2 mt-2">
             <View className="flex-row justify-around">
               <Pressable
-                className={`flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50 ${
+                className={`flex-1 flex-row items-center justify-center py-3 mx-1 rounded-full active:bg-gray-50 ${
                   post.is_liked ? "bg-red-50" : ""
                 }`}
                 onPress={handleLike}
@@ -398,20 +400,26 @@ export default function PostDetail() {
                   className={`text-xl mr-2 ${
                     post.is_liked ? "" : "opacity-60"
                   }`}>
-                  {post.is_liked ? "❤️" : "🤍"}
+                  {post.is_liked ? (
+                    <AntDesign name="heart" size={20} color="red" />
+                  ) : (
+                    <AntDesign name="hearto" size={20} color="black" />
+                  )}
                 </Text>
-                
               </Pressable>
 
               <Pressable
-                className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50"
+                className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-full bg-blue-50"
                 onPress={() => textInputRef.current?.focus()}>
                 <AntDesign name="message1" size={20} color="black" />
+                <Text className="ml-2 text-gray-800">
+                  {post.comment_count || 0}{" "}
+                  {post.comment_count === 1 ? "" : "Comments"}
+                </Text>
               </Pressable>
 
-              <Pressable className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50">
-              <AntDesign name="sharealt"  size={20} color="black" />
-                
+              <Pressable className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-full bg-gray-50">
+                <AntDesign name="sharealt" size={20} color="black" />
               </Pressable>
             </View>
           </View>
@@ -428,16 +436,16 @@ export default function PostDetail() {
   };
 
   const renderComment = ({ item }: { item: Comment }) => (
-    <View className="bg-white px-4 py-3 border-b border-gray-100">
-      <View className="flex-row items-start">
-        <View className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3 mt-1">
+    <View className="bg-white px-4 py-3">
+      <View className="flex-row items-start gap-2 bg-gray-50 p-3">
+        <View className="w-8 h-8 rounded-full m-2 bg-blue-500 flex items-center justify-center mr-3 ">
           <Text className="text-sm font-bold text-white">
             {item.username?.charAt(0).toUpperCase() || "U"}
           </Text>
         </View>
         <View className="flex-1">
           <View className="flex-row items-center justify-between mb-1">
-            <Text className="font-semibold text-sm text-gray-900">
+            <Text className="font-bold text-sm text-gray-900">
               {item.full_name || item.username || "Unknown User"}
             </Text>
             <View className="flex-row items-center">
@@ -459,7 +467,7 @@ export default function PostDetail() {
               )}
             </View>
           </View>
-          <Text className="text-gray-800 text-sm leading-5">
+          <Text className="text-gray-800 text-base leading-5">
             {item.content}
           </Text>
         </View>
@@ -503,8 +511,7 @@ export default function PostDetail() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-      >
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
         {/* Header */}
         <View className="bg-white px-4 py-3 border-b border-gray-200 flex-row items-center">
           <Pressable
@@ -551,8 +558,7 @@ export default function PostDetail() {
               paddingBottom: Platform.OS === "ios" ? 20 : 16,
               paddingTop: 16,
               paddingHorizontal: 16,
-            }}
-          >
+            }}>
             <View className="flex-row items-end">
               <View className="w-14 h-14 rounded-full bg-purple-500 flex items-center justify-center mr-3 mb-1">
                 <Text className="text-sm font-bold text-white">
@@ -563,7 +569,7 @@ export default function PostDetail() {
                 ref={textInputRef}
                 className="flex-1 border border-gray-300 rounded-full px-4 py-4 mr-3  max-h-[100px]"
                 placeholder="Write a comment..."
-                 placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#9CA3AF"
                 value={newComment}
                 onChangeText={setNewComment}
                 onFocus={handleInputFocus}

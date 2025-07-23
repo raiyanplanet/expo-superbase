@@ -368,15 +368,18 @@ export default function Feed() {
         {/* Post Header */}
         <View className="px-4 pt-4 pb-3">
           <View className="flex-row items-center">
-            <View className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center mr-3 shadow-sm">
+            <Pressable
+              className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center mr-3 shadow-sm"
+              onPress={() => router.push(`/user/${item.user_id}` as any)}>
               <Text className="text-xl font-bold text-white">
                 {item.username?.charAt(0).toUpperCase() || "U"}
               </Text>
-            </View>
+            </Pressable>
             <View className="flex-1">
               <Text className="font-semibold text-gray-900 text-base">
                 {item.full_name || item.username || "Unknown User"}
               </Text>
+
               <Text className="text-gray-500 text-sm">
                 {new Date(item.created_at).toLocaleDateString("en-US", {
                   month: "short",
@@ -394,18 +397,18 @@ export default function Feed() {
 
         {/* Post Content */}
         <View className="px-4 pb-3">
-          <Text className="text-gray-800 text-base leading-6">
+          <Text className="text-gray-800 text-xl leading-6">
             {displayContent}
             {shouldTruncate && (
               <Text
-                className="text-blue-500 font-medium"
+                className="text-purple-500 font-medium"
                 onPress={() => toggleExpandPost(item.id)}>
                 {" Read More"}
               </Text>
             )}
             {isExpanded && item.content.length > MAX_LENGTH && (
               <Text
-                className="text-blue-500 font-medium"
+                className="text-purple-500 font-medium"
                 onPress={() => toggleExpandPost(item.id)}>
                 {" Show Less"}
               </Text>
@@ -413,17 +416,36 @@ export default function Feed() {
           </Text>
         </View>
 
+        <View className="flex-row justify-between items-center py-2 px-3">
+          <View className="flex-row items-center">
+            <Text className="text-sm text-gray-500">
+              {(item.like_count || 0) > 0
+                ? `${item.like_count || 0} ${(item.like_count || 0) === 1 ? "like" : "likes"}`
+                : "0 likes"}
+            </Text>
+          </View>
+          <Text className="text-sm text-gray-500">
+            {(item.comment_count || 0) > 0
+              ? `${item.comment_count || 0} ${(item.comment_count || 0) === 1 ? "comment" : "comments"}`
+              : "0 comments"}
+          </Text>
+        </View>
+
         {/* Action Buttons */}
         <View className="border-t border-gray-100 mx-4"></View>
         <View className="flex-row justify-around py-2">
           <Pressable
-            className={`flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50 ${
+            className={`flex-1 flex-row items-center justify-center py-3 mx-1 rounded-full active:bg-red-50 bg-gray-50 ${
               isLiked ? "bg-red-50" : ""
             }`}
             onPress={() => handleLikePost(item.id)}>
             <Text
               className={`text-xl mr-2 ${isLiked ? "text-red-500" : "text-gray-600"}`}>
-              {isLiked ? "❤️" : "🤍"}
+              {isLiked ? (
+                <AntDesign name="heart" size={20} color="red" />
+              ) : (
+                <AntDesign name="hearto" size={20} color="gray" />
+              )}
             </Text>
             <Text className="text-md text-gray-500">
               {item.like_count ?? 0}
@@ -431,7 +453,7 @@ export default function Feed() {
           </Pressable>
 
           <Pressable
-            className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50"
+            className="flex-1 flex-row items-center justify-center  px-3 py-2 rounded-full mx-1  active:bg-gray-50 bg-blue-50"
             onPress={() => router.push(`../post/${item.id}`)}>
             <AntDesign name="message1" size={20} color="black" />
             <Text className="text-md text-gray-500 ml-2">
@@ -440,7 +462,7 @@ export default function Feed() {
           </Pressable>
 
           <Pressable
-            className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-lg active:bg-gray-50"
+            className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-full bg-gray-50"
             onPress={() => router.push(`../post/${item.id}`)}>
             <AntDesign name="sharealt" size={20} color="black" />
           </Pressable>

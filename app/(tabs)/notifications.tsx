@@ -260,7 +260,7 @@ export default function Notifications() {
 
     return (
       <Pressable
-        className={`flex-row items-start px-4 py-3 ${isUnread ? "bg-blue-50" : "bg-white"} border-b border-gray-100`}
+        className={`flex-row items-start px-4 py-3 rounded-lg mb-2 mx-2 ${isUnread ? "bg-blue-50" : "bg-white"} border-b border-gray-100`}
         onPress={() => {
           markAsRead(item.id);
           if (!isFriendRequest && item.post) {
@@ -363,10 +363,7 @@ export default function Notifications() {
   return (
     <View className="flex-1 bg-white">
       {/* Header */}
-      <View className="bg-white px-4 py-3 border-b border-gray-200">
-        <Text className="text-2xl font-bold text-gray-900 mb-1">
-          Notifications
-        </Text>
+      <View className="bg-white px-4 py-3 border-b mb-2 border-gray-200">
         {unreadCount > 0 && (
           <Pressable
             className="self-start"
@@ -388,7 +385,7 @@ export default function Notifications() {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View className="flex-1 justify-center items-center py-20">
+          <View className="flex-1 justify-center items-center p-4">
             <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-4">
               <Text className="text-3xl">🔔</Text>
             </View>

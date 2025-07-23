@@ -299,7 +299,7 @@ export default function ProfileTab() {
           ? item.content.slice(0, MAX_LENGTH) + "..."
           : item.content;
         return (
-          <Text className="text-gray-800 mb-4 leading-6 text-base">
+          <Text className="text-gray-800 mb-4 leading-6 text-xl">
             {displayContent}
             {shouldTruncate && (
               <Text
@@ -320,22 +320,22 @@ export default function ProfileTab() {
       })()}
 
       <View className="flex-row justify-between items-center pt-4 border-t border-gray-100">
-        <View className="flex-row items-center bg-red-50 px-3 py-2 rounded-full">
-          <Text className="text-red-500 mr-2">❤️</Text>
-          <Text className="text-red-600 font-semibold">
-            {item.like_count || 0}
-          </Text>
-        </View>
-
-        <View className="flex-row items-center bg-blue-50 px-3 py-2 rounded-full">
-          <Text className="text-blue-500 mr-2">💬</Text>
-          <Text className="text-blue-600 font-semibold">
-            {item.comment_count || 0}
-          </Text>
+        <View className="flex-1 flex-row items-center justify-center  px-3 py-3 rounded-full mx-1   bg-blue-50">
+          <AntDesign name="hearto" size={20} color="black" className="mr-2" />
+          <Text className="text-md text-gray-500">{item.like_count || 0}</Text>
         </View>
 
         <Pressable
-          className="bg-purple-600 px-4 py-2 rounded-full "
+          className="flex-1 flex-row items-center justify-center  px-3 py-3 rounded-full mx-1  active:bg-gray-50 bg-blue-50"
+          onPress={() => router.push(`../post/${item.id}`)}>
+          <AntDesign name="message1" size={20} color="black" />
+          <Text className="text-md text-gray-500 ml-2">
+            {item.comment_count ?? 0}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          className="bg-purple-600 px-4 py-3 rounded-full "
           onPress={() => router.push(`/post/${item.id}` as any)}>
           <Text className="text-white font-semibold text-sm">View Post</Text>
         </Pressable>
@@ -364,6 +364,9 @@ export default function ProfileTab() {
           </View>
           <Text className="text-3xl font-bold  mb-2 text-center ">
             {profile.full_name || profile.username || "Unknown User"}
+          </Text>
+          <Text className="text-gray-600 text-base mb-4">
+            @{profile.username}
           </Text>
           <Text className=" text-center mb-6 text-base leading-6 max-w-xs">
             {profile.bio || "No bio yet"}
@@ -531,7 +534,15 @@ export default function ProfileTab() {
       {/* Posts Section */}
       <View className="mx-4 mt-4">
         <View className="bg-white rounded-2xl p-4 mb-4 border border-gray-100">
-          <Text className="text-xl font-bold text-gray-900">📝 My Posts</Text>
+          <Text className="text-xl font-bold text-gray-900">
+            <AntDesign
+              name="filetext1"
+              size={20}
+              color="#3B82F6"
+              className="mr-2"
+            />{" "}
+            My Posts
+          </Text>
         </View>
         <FlatList
           data={posts}
@@ -541,7 +552,7 @@ export default function ProfileTab() {
           scrollEnabled={false}
           ListEmptyComponent={
             <View className="bg-white rounded-2xl p-12 items-center  border border-gray-100">
-              <Text className="text-6xl mb-4">📱</Text>
+              <AntDesign name="filetext1" size={50} color="#9CA3AF" />
               <Text className="text-gray-500 text-xl font-semibold text-center mb-2">
                 No posts yet
               </Text>
