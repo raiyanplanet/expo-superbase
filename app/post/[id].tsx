@@ -413,8 +413,7 @@ export default function PostDetail() {
                 onPress={() => textInputRef.current?.focus()}>
                 <AntDesign name="message1" size={20} color="black" />
                 <Text className="ml-2 text-gray-800">
-                  {post.comment_count || 0}{" "}
-                  {post.comment_count === 1 ? "" : "Comments"}
+                  {post.comment_count || 0} {post.comment_count === 1 ? "" : ""}
                 </Text>
               </Pressable>
 
@@ -511,7 +510,7 @@ export default function PostDetail() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
+        keyboardVerticalOffset={30}>
         {/* Header */}
         <View className="bg-white px-4 py-3 border-b border-gray-200 flex-row items-center">
           <Pressable

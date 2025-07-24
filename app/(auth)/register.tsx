@@ -1,10 +1,12 @@
 "use client";
+import LoadingSpinner from "@/components/Spinner";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -16,38 +18,47 @@ import {
 import { supabase } from "../../supabase/client";
 
 export default function Register() {
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleRegister = async () => {
     setError("");
+    setLoading(true);
 
     if (password !== confirmPassword) {
       setError("Passwords don't match");
+      setLoading(false);
       return;
     }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters");
+      setLoading(false);
       return;
     }
 
     if (!name.trim()) {
       setError("Name is required");
+      setLoading(false);
       return;
     }
     if (!username.trim()) {
       setError("Username is required");
+      setLoading(false);
       return;
     }
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
       setError(
         "Username must be 3-20 characters, letters, numbers, or underscores"
       );
+      setLoading(false);
       return;
     }
 
@@ -59,6 +70,7 @@ export default function Register() {
       .maybeSingle();
     if (usernameExists) {
       setError("Username already taken");
+      setLoading(false);
       return;
     }
     const { data: emailExists } = await supabase
@@ -68,6 +80,7 @@ export default function Register() {
       .maybeSingle();
     if (emailExists) {
       setError("Email already registered");
+      setLoading(false);
       return;
     }
 
@@ -86,19 +99,23 @@ export default function Register() {
       if (error) {
         console.error("❌ Registration error:", error);
         setError(error.message);
+        setLoading(false);
         return;
       }
 
       console.log("✅ Registration successful:", data.user?.email);
-      Alert.alert(
-        "Success",
-        "Account created! Please check your email to verify your account."
-      );
-      router.replace("/login");
+      setLoading(false);
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("❌ Registration exception:", error);
       setError("An unexpected error occurred");
+      setLoading(false);
     }
+  };
+
+  const handleModalClose = () => {
+    setShowSuccessModal(false);
+    router.replace("/login");
   };
 
   return (
@@ -146,33 +163,56 @@ export default function Register() {
               onChangeText={setEmail}
             />
 
-            <TextInput
-              className="mb-3 border border-b rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
-              placeholder="Password"
-              placeholderTextColor="#9CA3AF"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
+            <View className="relative mb-3">
+              <TextInput
+                className="border rounded-lg px-3 border-gray-200 py-3 text-lg text-gray-900 bg-transparent pr-10"
+                placeholder="Password"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+              />
+              <Pressable
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onPress={() => setShowPassword((prev) => !prev)}>
+                {showPassword ? (
+                  <Ionicons name="eye-outline" size={24} color="#6B7280" />
+                ) : (
+                  <Ionicons name="eye-off-outline" size={24} color="#6B7280" />
+                )}
+              </Pressable>
+            </View>
 
-            <TextInput
-              className="border border-b rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
-              placeholder="Confirm Password"
-              placeholderTextColor="#9CA3AF"
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
+            <View className="relative mb-3">
+              <TextInput
+                className="border rounded-lg px-3 border-gray-200 py-3 text-lg text-gray-900 bg-transparent pr-10"
+                placeholder="Confirm Password"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showPassword}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+              <Pressable
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onPress={() => setShowPassword((prev) => !prev)}>
+                {showPassword ? (
+                  <Ionicons name="eye-outline" size={24} color="#6B7280" />
+                ) : (
+                  <Ionicons name="eye-off-outline" size={24} color="#6B7280" />
+                )}
+              </Pressable>
+            </View>
 
             {error ? (
               <Text className="text-red-500 text-sm mt-2">{error}</Text>
             ) : null}
 
             <TouchableOpacity
-              className="bg-purple-600 rounded-lg py-4 mt-8"
-              onPress={handleRegister}>
+              className="bg-blue-600 rounded-full py-4 mt-8"
+              onPress={handleRegister}
+              disabled={loading}>
               <Text className="text-white text-center text-lg font-medium">
-                Create Account
+                {loading ? <LoadingSpinner /> : "Sign Up"}
               </Text>
             </TouchableOpacity>
 
@@ -181,12 +221,44 @@ export default function Register() {
               className="mt-6">
               <Text className="text-gray-600 text-center">
                 Already have an account?{" "}
-                <Text className="text-purple-600 font-medium">Sign in</Text>
+                <Text className="text-blue-600 font-medium">Sign in</Text>
               </Text>
             </Pressable>
           </View>
         </View>
       </ScrollView>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleModalClose}>
+        <View className="flex-1 justify-center items-center bg-black/50">
+          <View className="bg-white rounded-2xl p-6 mx-8 max-w-sm w-full">
+            <View className="items-center mb-4">
+              <View className="bg-green-100 rounded-full p-3 mb-3">
+                <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
+              </View>
+              <Text className="text-xl font-semibold text-gray-900 mb-2 text-center">
+                Account Created Successfully!
+              </Text>
+              <Text className="text-gray-600 text-center">
+                Please check your email to verify your account before signing
+                in.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              className="bg-blue-600 rounded-full py-3 mt-4"
+              onPress={handleModalClose}>
+              <Text className="text-white text-center text-lg font-medium">
+                Continue to Sign In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

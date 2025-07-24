@@ -1,10 +1,21 @@
 "use client";
+import LoadingSpinner from "@/components/Spinner";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { supabase } from "../../supabase/client";
 
 export default function Login() {
+  const [showPassword, setShowPassword] = useState(false);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,9 +32,12 @@ export default function Login() {
         password,
       });
 
-      if (error) {
-        console.error("❌ Login error:", error);
-        setError(error.message);
+      if (email.trim() === "") {
+        setError("Enter valid email");
+        return;
+      }
+      if (password.trim() === "") {
+        setError("Password cannot be empty or blank");
         return;
       }
 
@@ -54,7 +68,7 @@ export default function Login() {
 
       <View className="space-y-4">
         <TextInput
-          className="mb-3 border  rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
+          className="mb-3 border  rounded-lg px-3 border-gray-200 py-4 text-lg text-gray-900 bg-transparent"
           placeholder="Email"
           placeholderTextColor="#9CA3AF"
           autoCapitalize="none"
@@ -63,34 +77,45 @@ export default function Login() {
           editable={!loading}
         />
 
-        <TextInput
-          className="border  rounded-md px-3 border-gray-200 pb-3 text-lg text-gray-900 bg-transparent"
-          placeholder="Password"
-          placeholderTextColor="#9CA3AF"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          editable={!loading}
-        />
+        <View className="relative">
+          <TextInput
+            className="border rounded-lg px-3 border-gray-200 py-4 text-lg text-gray-900 bg-transparent pr-10"
+            placeholder="Password"
+            placeholderTextColor="#9CA3AF"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+            editable={!loading}
+          />
+          <Pressable
+            className="absolute right-3 top-1/2 -translate-y-1/2"
+            onPress={() => setShowPassword((prev) => !prev)}>
+            {showPassword ? (
+              <Ionicons name="eye-outline" size={24} color="#6B7280" />
+            ) : (
+              <Ionicons name="eye-off-outline" size={24} color="#6B7280" />
+            )}
+          </Pressable>
+        </View>
 
         {error ? (
           <Text className="text-red-500 text-sm mt-2">{error}</Text>
         ) : null}
 
         <TouchableOpacity
-          className={`rounded-lg py-4 mt-8 ${loading ? "bg-purple-400" : "bg-purple-600"}`}
+          className={`rounded-full py-4 mt-8 ${loading ? "bg-blue-400" : "bg-blue-600"}`}
           onPress={handleLogin}
           disabled={loading}>
           <Text className="text-white text-center text-lg font-medium">
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? <LoadingSpinner /> : "Sign in"}
           </Text>
         </TouchableOpacity>
         <Text className="text-gray-600 text-center mt-5">or</Text>
         <TouchableOpacity
           onPress={() => router.replace("/register")}
-          className="mt-6 bg-gray-950 rounded-lg py-4"
+          className="mt-6 bg-gray-100 rounded-full border border-gray-200 py-4 "
           disabled={loading}>
-          <Text className="text-gray-100 text-center">Create an account</Text>
+          <Text className="text-gray-600 text-center">Create an account</Text>
         </TouchableOpacity>
       </View>
     </View>

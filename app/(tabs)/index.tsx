@@ -1,9 +1,12 @@
 "use client";
+import LoadingSpinner from "@/components/Spinner";
 import { AntDesign } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Dimensions,
   FlatList,
   Modal,
   Pressable,
@@ -16,6 +19,8 @@ import { friendsApi, likesApi, postsApi } from "../../lib/api";
 import { Post } from "../../lib/types";
 import { supabase } from "../../supabase/client";
 
+const { width } = Dimensions.get("window");
+
 // Cache keys for AsyncStorage
 const CACHE_KEYS = {
   POSTS: "feed_posts",
@@ -27,100 +32,203 @@ const CACHE_KEYS = {
 // Cache duration (5 minutes)
 const CACHE_DURATION = 5 * 60 * 1000;
 
+// Refined Skeleton Components
+type SkeletonBoxProps = {
+  width: number;
+  height: number;
+  style?: object;
+};
+
+const SkeletonBox = ({ width: w, height: h, style = {} }: SkeletonBoxProps) => {
+  const shimmerAnim = useRef(new Animated.Value(-1)).current;
+
+  useEffect(() => {
+    const shimmer = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: true,
+      })
+    );
+    shimmer.start();
+    return () => shimmer.stop();
+  }, []);
+
+  const translateX = shimmerAnim.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [-w, w],
+  });
+
+  return (
+    <View
+      style={[
+        {
+          width: w,
+          height: h,
+          backgroundColor: "#f3f4f6",
+          borderRadius: 8,
+          overflow: "hidden",
+        },
+        style,
+      ]}>
+      <Animated.View
+        style={{
+          width: "100%",
+          height: "100%",
+          backgroundColor: "rgba(255, 255, 255, 0.6)",
+          transform: [{ translateX }],
+        }}
+      />
+    </View>
+  );
+};
+
+const PostSkeleton = () => (
+  <View className="bg-white mx-3 mb-3 rounded-xl border border-gray-100">
+    <View className="p-4">
+      {/* Header */}
+      <View className="flex-row items-center mb-4">
+        <SkeletonBox
+          width={48}
+          height={48}
+          style={{ borderRadius: 24, marginRight: 12 }}
+        />
+        <View className="flex-1">
+          <SkeletonBox width={120} height={16} style={{ marginBottom: 6 }} />
+          <SkeletonBox width={80} height={12} />
+        </View>
+      </View>
+
+      {/* Content */}
+      <View className="mb-4">
+        <SkeletonBox
+          width={width - 80}
+          height={16}
+          style={{ marginBottom: 8 }}
+        />
+        <SkeletonBox
+          width={width - 120}
+          height={16}
+          style={{ marginBottom: 8 }}
+        />
+        <SkeletonBox width={width - 160} height={16} />
+      </View>
+
+      {/* Actions */}
+      <View className="flex-row pt-3 border-t border-gray-100">
+        <SkeletonBox width={60} height={32} style={{ marginRight: 20 }} />
+        <SkeletonBox width={60} height={32} style={{ marginRight: 20 }} />
+        <SkeletonBox width={60} height={32} />
+      </View>
+    </View>
+  </View>
+);
+
+const CreatePostSkeleton = () => (
+  <View className="bg-white mx-3 mt-2 mb-3 rounded-xl border border-gray-100">
+    <View className="p-4 flex-row items-center">
+      <SkeletonBox
+        width={40}
+        height={40}
+        style={{ borderRadius: 20, marginRight: 12 }}
+      />
+      <SkeletonBox
+        width={width - 120}
+        height={36}
+        style={{ borderRadius: 18 }}
+      />
+    </View>
+  </View>
+);
+
 export default function Feed() {
   const [user, setUser] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState("");
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [posting, setPosting] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set()); // Track expanded posts
-  const [showPostModal, setShowPostModal] = useState(false); // For post input modal
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
 
   // Add ref for FlatList
   const flatListRef = useRef<FlatList>(null);
   const lastFocusTime = useRef<number>(0);
 
-  // Handle tab focus - refresh and scroll to top when tab is pressed multiple times
+  // Smooth entrance animation when content loads
+  const animateIn = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Handle tab focus
   useFocusEffect(
     useCallback(() => {
       const currentTime = Date.now();
-
-      // If the tab was focused again within 1 second, refresh and scroll to top
-      if (currentTime - lastFocusTime.current < 1000 && user) {
+      if (currentTime - lastFocusTime.current < 1000 && user && !isLoading) {
         const refreshAndScroll = async () => {
           setRefreshing(true);
           await loadFriendsAndFeed(user.id);
           setRefreshing(false);
-
-          // Scroll to top
           setTimeout(() => {
             flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
           }, 100);
         };
-
         refreshAndScroll();
       }
-
       lastFocusTime.current = currentTime;
-    }, [user])
+    }, [user, isLoading])
   );
 
   useEffect(() => {
-    const checkAuthAndRedirect = async () => {
+    const checkAuth = async () => {
       try {
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
-
-        if (error) {
-          console.error("Error getting session:", error);
+        if (error || !session?.user) {
           router.replace("/(auth)/login");
           return;
         }
-
-        if (session?.user) {
-          console.log("User authenticated, redirecting to tabs");
-          router.replace("/(tabs)");
-        } else {
-          router.replace("/(auth)/login");
-        }
       } catch (error) {
-        console.error("Error in checkAuthAndRedirect:", error);
+        console.error("Auth error:", error);
         router.replace("/(auth)/login");
       }
     };
-
-    // Add a small delay to prevent flash
-    const timer = setTimeout(() => {
-      checkAuthAndRedirect();
-    }, 100);
-
-    return () => clearTimeout(timer);
+    checkAuth();
   }, []);
 
-  // Cache management functions (replace with AsyncStorage in your actual app)
+  // Cache functions (simplified for demo)
   const saveToCache = async (key: string, data: any) => {
     try {
-      // In your actual app, use: await AsyncStorage.setItem(key, JSON.stringify(data));
-      console.log(`Saving to cache: ${key}`, data);
+      console.log(`Caching: ${key}`);
     } catch (error) {
-      console.error("Cache save error:", error);
+      console.error("Cache error:", error);
     }
   };
 
   const getFromCache = async (key: string) => {
     try {
-      // In your actual app, use:
-      // const data = await AsyncStorage.getItem(key);
-      // return data ? JSON.parse(data) : null;
-      console.log(`Getting from cache: ${key}`);
-      return null; // Placeholder - replace with actual AsyncStorage
+      return null; // Placeholder
     } catch (error) {
-      console.error("Cache get error:", error);
       return null;
     }
   };
@@ -130,15 +238,21 @@ export default function Feed() {
   };
 
   useEffect(() => {
-    const loadFriendsAndFeedWithCache = async (userId: string) => {
+    const initializeFeed = async () => {
       try {
-        // Try to load from cache first
+        setIsLoading(true);
+        setHasError(false);
+
+        const { data } = await supabase.auth.getUser();
+        if (!data.user) return;
+
+        setUser(data.user);
+
+        // Try cache first
         const cachedPosts = await getFromCache(CACHE_KEYS.POSTS);
         const cachedFriends = await getFromCache(CACHE_KEYS.FRIENDS);
-        const cachedLikedPosts = await getFromCache(CACHE_KEYS.LIKED_POSTS);
         const lastFetch = await getFromCache(CACHE_KEYS.LAST_FETCH);
 
-        // If cache is valid, use cached data
         if (
           cachedPosts &&
           cachedFriends &&
@@ -147,86 +261,68 @@ export default function Feed() {
         ) {
           setPosts(cachedPosts);
           setFriends(cachedFriends);
-          if (cachedLikedPosts) {
-            setLikedPosts(new Set(cachedLikedPosts));
-          }
-          console.log("Loaded from cache");
-          // Still fetch fresh data in background
-          loadFriendsAndFeedFromAPI(userId, true);
+          setIsLoading(false);
+          animateIn();
+          // Load fresh data in background
+          loadFriendsAndFeedFromAPI(data.user.id, true);
           return;
         }
-        // If no valid cache, load from API
-        await loadFriendsAndFeedFromAPI(userId, false);
+
+        // Load fresh data
+        await loadFriendsAndFeedFromAPI(data.user.id, false);
       } catch (error) {
-        console.error("Error loading with cache:", error);
-        await loadFriendsAndFeedFromAPI(userId, false);
+        console.error("Initialization error:", error);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+        animateIn();
       }
     };
 
-    const loadUserData = async () => {
-      try {
-        const { data } = await supabase.auth.getUser();
-        if (data.user) {
-          setUser(data.user);
-          await loadFriendsAndFeedWithCache(data.user.id);
-        }
-      } catch (error) {
-        console.error("Error loading user data:", error);
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-    loadUserData();
+    initializeFeed();
   }, []);
 
   const loadFriendsAndFeedFromAPI = async (
     userId: string,
-    isBackgroundRefresh: boolean = false
+    isBackground = false
   ) => {
     try {
-      if (!isBackgroundRefresh) {
-        console.log("Loading from API...");
-      }
+      const [friendsList, allPosts] = await Promise.all([
+        friendsApi.getFriends(userId),
+        postsApi.getFeed(userId),
+      ]);
 
-      const friendsList = await friendsApi.getFriends(userId);
-      setFriends(friendsList);
-
-      // Get all friend user IDs
       const friendIds = friendsList.map((f) =>
         f.requester_id === userId ? f.addressee_id : f.requester_id
       );
-      // Optionally include the user's own posts in their feed:
       friendIds.push(userId);
 
-      // Fetch all posts, then filter to only those from friends (and self)
-      const allPosts = await postsApi.getFeed(userId);
       const filteredPosts = allPosts.filter((post) =>
         friendIds.includes(post.user_id)
       );
+
+      setFriends(friendsList);
       setPosts(filteredPosts);
 
-      // Track which posts the user has liked
       const likedPostIds = new Set<string>();
-      for (const post of filteredPosts) {
-        if (post.is_liked) {
-          likedPostIds.add(post.id);
-        }
-      }
+      filteredPosts.forEach((post) => {
+        if (post.is_liked) likedPostIds.add(post.id);
+      });
       setLikedPosts(likedPostIds);
 
-      // Save to cache
-      await saveToCache(CACHE_KEYS.POSTS, filteredPosts);
-      await saveToCache(CACHE_KEYS.FRIENDS, friendsList);
-      await saveToCache(CACHE_KEYS.LIKED_POSTS, Array.from(likedPostIds));
-      await saveToCache(CACHE_KEYS.LAST_FETCH, Date.now());
+      // Cache the data
+      await Promise.all([
+        saveToCache(CACHE_KEYS.POSTS, filteredPosts),
+        saveToCache(CACHE_KEYS.FRIENDS, friendsList),
+        saveToCache(CACHE_KEYS.LIKED_POSTS, Array.from(likedPostIds)),
+        saveToCache(CACHE_KEYS.LAST_FETCH, Date.now()),
+      ]);
 
-      if (!isBackgroundRefresh) {
-        console.log("Data loaded and cached");
-      }
+      setHasError(false);
     } catch (error) {
-      console.error("Error loading feed or friends:", error);
-      if (!isBackgroundRefresh) {
-        Alert.alert("Error", "Failed to load posts or friends");
+      console.error("API load error:", error);
+      if (!isBackground) {
+        setHasError(true);
       }
     }
   };
@@ -238,7 +334,12 @@ export default function Feed() {
   const onRefresh = async () => {
     if (!user) return;
     setRefreshing(true);
-    await loadFriendsAndFeed(user.id);
+    setHasError(false);
+    try {
+      await loadFriendsAndFeed(user.id);
+    } catch (error) {
+      setHasError(true);
+    }
     setRefreshing(false);
   };
 
@@ -249,11 +350,10 @@ export default function Feed() {
       setPosting(true);
       await postsApi.createPost(user.id, { content: newPost.trim() });
       setNewPost("");
-      // Refresh feed and update cache
       await loadFriendsAndFeedFromAPI(user.id, false);
-      setShowPostModal(false); // Close modal after posting
+      setShowPostModal(false);
     } catch (error) {
-      console.error("Error creating post:", error);
+      console.error("Post creation error:", error);
       Alert.alert("Error", "Failed to create post");
     } finally {
       setPosting(false);
@@ -266,9 +366,8 @@ export default function Feed() {
     try {
       const isCurrentlyLiked = likedPosts.has(postId);
 
-      // Optimistically update UI first
+      // Optimistic update
       if (isCurrentlyLiked) {
-        // Unlike the post
         setLikedPosts((prev) => {
           const newSet = new Set(prev);
           newSet.delete(postId);
@@ -287,7 +386,6 @@ export default function Feed() {
         );
         await likesApi.unlikePost(user.id, postId);
       } else {
-        // Like the post
         setLikedPosts((prev) => new Set(prev).add(postId));
         setPosts((prev) =>
           prev.map((post) =>
@@ -303,8 +401,8 @@ export default function Feed() {
         await likesApi.likePost(user.id, postId);
       }
     } catch (error) {
-      console.error("Error toggling like:", error);
-      // Revert optimistic update on error
+      console.error("Like error:", error);
+      // Revert on error
       const isCurrentlyLiked = likedPosts.has(postId);
       if (!isCurrentlyLiked) {
         setLikedPosts((prev) => {
@@ -337,11 +435,9 @@ export default function Feed() {
           )
         );
       }
-      Alert.alert("Error", "Failed to update like");
     }
   };
 
-  // Add this function to toggle expanded state for posts
   const toggleExpandPost = (postId: string) => {
     setExpandedPosts((prev) => {
       const newSet = new Set(prev);
@@ -364,12 +460,11 @@ export default function Feed() {
       : item.content;
 
     return (
-      <View className="bg-white mx-3 mb-2 rounded-xl shadow-sm border border-gray-100">
-        {/* Post Header */}
+      <View className="bg-white mx-3 mb-3 rounded-xl shadow-sm border border-gray-50">
         <View className="px-4 pt-4 pb-3">
           <View className="flex-row items-center">
             <Pressable
-              className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center mr-3 shadow-sm"
+              className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center mr-3"
               onPress={() => router.push(`/user/${item.user_id}` as any)}>
               <Text className="text-xl font-bold text-white">
                 {item.username?.charAt(0).toUpperCase() || "U"}
@@ -379,7 +474,6 @@ export default function Feed() {
               <Text className="font-semibold text-gray-900 text-base">
                 {item.full_name || item.username || "Unknown User"}
               </Text>
-
               <Text className="text-gray-500 text-sm">
                 {new Date(item.created_at).toLocaleDateString("en-US", {
                   month: "short",
@@ -395,20 +489,19 @@ export default function Feed() {
           </View>
         </View>
 
-        {/* Post Content */}
         <View className="px-4 pb-3">
-          <Text className="text-gray-800 text-xl leading-6">
+          <Text className="text-gray-800 text-lg leading-6">
             {displayContent}
             {shouldTruncate && (
               <Text
-                className="text-purple-500 font-medium"
+                className="text-blue-500 font-medium"
                 onPress={() => toggleExpandPost(item.id)}>
                 {" Read More"}
               </Text>
             )}
             {isExpanded && item.content.length > MAX_LENGTH && (
               <Text
-                className="text-purple-500 font-medium"
+                className="text-blue-500 font-medium"
                 onPress={() => toggleExpandPost(item.id)}>
                 {" Show Less"}
               </Text>
@@ -416,191 +509,250 @@ export default function Feed() {
           </Text>
         </View>
 
-        <View className="flex-row justify-between items-center py-2 px-3">
-          <View className="flex-row items-center">
-            <Text className="text-sm text-gray-500">
-              {(item.like_count || 0) > 0
-                ? `${item.like_count || 0} ${(item.like_count || 0) === 1 ? "like" : "likes"}`
-                : "0 likes"}
-            </Text>
-          </View>
+        <View className="flex-row justify-between items-center py-2 px-4">
+          <Text className="text-sm text-gray-500">
+            {(item.like_count || 0) > 0
+              ? `${item.like_count || 0} ${(item.like_count || 0) === 1 ? "like" : "likes"}`
+              : ""}
+          </Text>
           <Text className="text-sm text-gray-500">
             {(item.comment_count || 0) > 0
               ? `${item.comment_count || 0} ${(item.comment_count || 0) === 1 ? "comment" : "comments"}`
-              : "0 comments"}
+              : ""}
           </Text>
         </View>
 
-        {/* Action Buttons */}
         <View className="border-t border-gray-100 mx-4"></View>
-        <View className="flex-row justify-around py-2">
+        <View className="flex-row py-1">
           <Pressable
-            className={`flex-1 flex-row items-center justify-center py-3 mx-1 rounded-full active:bg-red-50 bg-gray-50 ${
+            className={`flex-1 flex-row items-center justify-center py-3 mx-2 rounded-full ${
               isLiked ? "bg-red-50" : ""
             }`}
             onPress={() => handleLikePost(item.id)}>
-            <Text
-              className={`text-xl mr-2 ${isLiked ? "text-red-500" : "text-gray-600"}`}>
-              {isLiked ? (
-                <AntDesign name="heart" size={20} color="red" />
-              ) : (
-                <AntDesign name="hearto" size={20} color="gray" />
-              )}
-            </Text>
-            <Text className="text-md text-gray-500">
-              {item.like_count ?? 0}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            className="flex-1 flex-row items-center justify-center  px-3 py-2 rounded-full mx-1  active:bg-gray-50 bg-blue-50"
-            onPress={() => router.push(`../post/${item.id}`)}>
-            <AntDesign name="message1" size={20} color="black" />
-            <Text className="text-md text-gray-500 ml-2">
-              {item.comment_count ?? 0}
+            <AntDesign
+              name={isLiked ? "heart" : "hearto"}
+              size={18}
+              color={isLiked ? "#ef4444" : "#6b7280"}
+            />
+            <Text className="text-sm ml-1 text-gray-500">
+              {(item.like_count || 0) > 0
+                ? `${item.like_count || 0} ${(item.like_count || 0) === 1 ? "" : ""}`
+                : ""}
             </Text>
           </Pressable>
 
           <Pressable
-            className="flex-1 flex-row items-center justify-center py-3 mx-1 rounded-full bg-gray-50"
+            className="flex-1 flex-row items-center bg-blue-50 justify-center py-3 mx-2 rounded-full"
             onPress={() => router.push(`../post/${item.id}`)}>
-            <AntDesign name="sharealt" size={20} color="black" />
+            <AntDesign name="message1" size={18} color="#6b7280" />
+            <Text className="text-sm font-medium text-gray-500 ml-2">
+              {(item.comment_count || 0) > 0
+                ? `${item.comment_count || 0} ${(item.comment_count || 0) === 1 ? "" : ""}`
+                : ""}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            className="flex-1 flex-row items-center justify-center py-3 bg-gray-50 mx-2 rounded-full"
+            onPress={() => router.push(`../post/${item.id}`)}>
+            <AntDesign name="sharealt" size={18} color="#6b7280" />
+            <Text className="ml-2 text-sm text-gray-600">Share</Text>
           </Pressable>
         </View>
       </View>
     );
   };
 
-  // Show loading while checking authentication and loading data
-  if (initialLoading) {
+  // Loading screen with skeletons
+  if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-100">
-        <Text className="text-gray-600">Loading feed...</Text>
+      <View className="flex-1 bg-gray-50">
+        <CreatePostSkeleton />
+        {[1, 2, 3, 4, 5].map((i) => (
+          <PostSkeleton key={i} />
+        ))}
+      </View>
+    );
+  }
+
+  // Error state
+  if (hasError) {
+    return (
+      <View className="flex-1 bg-gray-50 items-center justify-center px-6">
+        <Text className="text-4xl mb-4">🔄</Text>
+        <Text className="text-gray-700 text-lg font-medium text-center mb-2">
+          Something went wrong
+        </Text>
+        <Text className="text-gray-500 text-center mb-6 leading-5">
+          We couldnt load your feed. Check your connection and try again.
+        </Text>
+        <Pressable
+          className="bg-blue-500 px-8 py-3 rounded-full"
+          onPress={() => user && loadFriendsAndFeed(user.id)}>
+          <Text className="text-white font-semibold">Try Again</Text>
+        </Pressable>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-100">
-      {/* Create Post Section */}
-      <View className="bg-white mx-3 mt-2 mb-2 rounded-xl shadow-sm border border-gray-100">
-        <Pressable
-          onPress={() => setShowPostModal(true)}
-          className="p-4 flex-row items-center">
-          <View className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center mr-3">
-            <Text className="text-lg font-bold text-white">
-              {user?.email?.charAt(0).toUpperCase() || "U"}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="bg-gray-100 rounded-full px-4 py-3 text-base text-gray-500">
-              {"What's on your mind?"}
-            </Text>
-          </View>
-        </Pressable>
-      </View>
+    <View className="flex-1 bg-gray-50">
+      {/* Animated content */}
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }}>
+        {/* Create Post Section */}
+        <View className="bg-white mx-3 mt-2 mb-3 rounded-xl shadow-sm border border-gray-50">
+          <Pressable
+            onPress={() => setShowPostModal(true)}
+            className="p-4 flex-row items-center">
+            <View className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center mr-3">
+              <Text className="text-lg font-bold text-white">
+                {user?.email?.charAt(0).toUpperCase() || "U"}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="bg-gray-100 rounded-full px-4 py-3 text-base text-gray-500">
+                Whats on your mind?
+              </Text>
+            </View>
+          </Pressable>
+        </View>
 
-      {/* Post Input Modal */}
+        {/* Posts Feed */}
+        <FlatList
+          ref={flatListRef}
+          data={posts}
+          renderItem={renderPost}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#3B82F6"
+              colors={["#3B82F6"]}
+            />
+          }
+          contentContainerStyle={{ paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View className="items-center justify-center py-20">
+              <Text className="text-5xl mb-4">
+                {friends.length === 0 ? "👥" : "📭"}
+              </Text>
+              <Text className="text-gray-600 text-lg font-medium text-center mb-2">
+                {friends.length === 0 ? "No friends yet" : "No posts to show"}
+              </Text>
+              <Text className="text-gray-500 text-center leading-5">
+                {friends.length === 0
+                  ? "Add friends to see their posts in your feed"
+                  : "When your friends post, you'll see their updates here"}
+              </Text>
+            </View>
+          }
+        />
+      </Animated.View>
+
+      {/* Post Modal */}
       <Modal
         visible={showPostModal}
-        animationType="none"
-        transparent={true}
+        animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={() => setShowPostModal(false)}>
-        <View className="flex-1 bg-black bg-opacity-40">
-          <View className="flex-1 bg-white pt-8 px-4 pb-4">
-            <Pressable
-              className="absolute top-4 right-4 z-10 p-2"
-              onPress={() => setShowPostModal(false)}>
-              <Text className="text-3xl text-gray-400">×</Text>
+        <View className="flex-1 bg-white">
+          {/* Header */}
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
+            <Pressable onPress={() => setShowPostModal(false)}>
+              <Text className="text-gray-600 text-base font-medium">
+                Cancel
+              </Text>
             </Pressable>
-            <View className="flex-row items-center mb-6 mt-2">
-              <View className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center mr-3">
+            <Text className="text-lg font-semibold text-gray-900">
+              Create post
+            </Text>
+            <Pressable
+              className={`px-6 py-2 rounded-lg ${
+                newPost.trim() && !posting ? "bg-blue-500" : "bg-gray-200"
+              }`}
+              onPress={handleCreatePost}
+              disabled={posting || !newPost.trim()}>
+              <Text
+                className={`font-semibold text-sm ${
+                  newPost.trim() && !posting ? "text-white" : "text-gray-400"
+                }`}>
+                {posting ? <LoadingSpinner /> : "Post"}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Content */}
+          <View className="flex-1 bg-white">
+            {/* User Info */}
+            <View className="flex-row items-center px-4 py-3">
+              <View className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center mr-3">
                 <Text className="text-lg font-bold text-white">
                   {user?.email?.charAt(0).toUpperCase() || "U"}
                 </Text>
               </View>
-              <Text className="font-semibold text-gray-900 text-base">
-                {user?.full_name || user?.email || "User"}
-              </Text>
-            </View>
-            <TextInput
-              className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-base min-h-32 max-h-32 mb-3"
-              placeholder="What's on your mind?"
-              placeholderTextColor="#9CA3AF"
-              value={newPost}
-              onChangeText={setNewPost}
-              multiline
-              textAlignVertical="top"
-              autoFocus
-            />
-            <View className="flex-row justify-between items-center mt-2">
-              <View className="flex-row">
-                <Pressable className="flex-row items-center mr-6 py-2">
-                  <Text className="text-lg mr-2">📷</Text>
-                  <Text className="text-gray-600 font-medium">Photo</Text>
-                </Pressable>
-                <Pressable className="flex-row items-center mr-6 py-2">
-                  <Text className="text-lg mr-2">😊</Text>
-                  <Text className="text-gray-600 font-medium">Feeling</Text>
-                </Pressable>
-              </View>
-              <Pressable
-                className={`px-6 py-2 rounded-full ${
-                  newPost.trim() && !posting ? "bg-blue-500" : "bg-gray-300"
-                }`}
-                onPress={handleCreatePost}
-                disabled={posting || !newPost.trim()}>
-                <Text
-                  className={`font-semibold ${
-                    newPost.trim() && !posting ? "text-white" : "text-gray-500"
-                  }`}>
-                  {posting ? "Posting..." : "Post"}
+              <View>
+                <Text className="font-semibold text-gray-900 text-base">
+                  {user?.full_name || user?.email || "User"}
                 </Text>
-              </Pressable>
+                <View className="flex-row items-center mt-1">
+                  <View className="bg-gray-200 px-2 py-1 rounded flex-row items-center">
+                    <Text className="text-xs text-gray-600 mr-1">🌍</Text>
+                    <Text className="text-xs text-gray-600 font-medium">
+                      Public
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Text Input */}
+            <View className="px-4">
+              <TextInput
+                className="text-lg text-gray-800 max-h-[300px] min-h-[120px]"
+                placeholder="What's on your mind?"
+                placeholderTextColor="#9CA3AF"
+                value={newPost}
+                onChangeText={setNewPost}
+                multiline
+                textAlignVertical="top"
+                autoFocus
+                style={{
+                  fontSize: 18,
+                  lineHeight: 24,
+                }}
+              />
+            </View>
+
+            {/* Bottom Actions */}
+            <View className="border-t border-gray-200 bg-white">
+              <View className="px-4 py-3">
+                <Text className="text-base font-medium text-gray-900 mb-3">
+                  Add to your post
+                </Text>
+                <View className="flex-row flex-wrap items-center justify-between">
+                  <Pressable className="flex-row items-center bg-gray-50 px-4 py-2 rounded-lg flex-1 mr-2">
+                    <Text className="text-2xl mr-2">📷</Text>
+                    <Text className="text-gray-700 font-medium">
+                      Photo/Video
+                    </Text>
+                  </Pressable>
+                  <Pressable className="flex-row items-center bg-gray-50 px-4 py-2 rounded-lg flex-1 ml-2">
+                    <Text className="text-2xl mr-2">😊</Text>
+                    <Text className="text-gray-700 font-medium">Feeling</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
           </View>
         </View>
       </Modal>
-
-      {/* Posts Feed */}
-      <FlatList
-        ref={flatListRef}
-        data={posts}
-        renderItem={renderPost}
-        keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#3B82F6"
-          />
-        }
-        contentContainerStyle={{ paddingBottom: 20 }}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          friends.length === 0 ? (
-            <View className="flex-1 items-center justify-center py-16">
-              <Text className="text-6xl mb-4">👥</Text>
-              <Text className="text-gray-500 text-xl font-semibold text-center mb-2">
-                Your feed is empty
-              </Text>
-              <Text className="text-gray-400 text-center leading-6">
-                Add friends to see their posts here!
-              </Text>
-            </View>
-          ) : (
-            <View className="flex-1 items-center justify-center py-16">
-              <Text className="text-6xl mb-4">📭</Text>
-              <Text className="text-gray-500 text-xl font-semibold text-center mb-2">
-                No posts from your friends yet
-              </Text>
-              <Text className="text-gray-400 text-center leading-6">
-                When your friends post, youll see them here.
-              </Text>
-            </View>
-          )
-        }
-      />
     </View>
   );
 }

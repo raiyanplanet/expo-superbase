@@ -17,6 +17,7 @@ import { Post, Profile } from "../../lib/types";
 import { supabase } from "../../supabase/client";
 
 export default function UserDetails() {
+  const [friendList, setFriendList] = useState<Profile[]>([]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
@@ -53,6 +54,31 @@ export default function UserDetails() {
       setLoading(false);
     }
   }, [id]);
+
+  // Load friend's friends if you are friends
+  const loadFriendList = async (targetUserId: string) => {
+    try {
+      const friends = await friendsApi.getFriends(targetUserId);
+      const profiles: Profile[] = friends
+        .map((friend) =>
+          friend.requester_id === targetUserId
+            ? friend.addressee_profile
+            : friend.requester_profile
+        )
+        .filter((p): p is Profile => !!p);
+      setFriendList(profiles);
+    } catch (error) {
+      console.error("Error loading friend list:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (friendStatus === "friends" && id) {
+      loadFriendList(id as string);
+    } else {
+      setFriendList([]);
+    }
+  }, [friendStatus, id]);
 
   useEffect(() => {
     loadUserData();
@@ -497,11 +523,51 @@ export default function UserDetails() {
           </View>
         </View>
 
+        {/* Friends Section */}
+        <View className="mx-4 m-2 bg-white rounded-2xl p-6 border border-gray-100">
+          {friendStatus === "friends" && (
+            <View className="flex-1">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="font-semibold text-base">
+                  Friends ({friendList.length})
+                </Text>
+              </View>
+              <FlatList
+                data={friendList}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/user/${item.id}`)}
+                    className="items-center mr-6">
+                    <View className="w-16 h-16 rounded-full bg-purple-500 flex items-center justify-center mb-3 ">
+                      <Text className="text-2xl font-bold text-white">
+                        {item.username?.charAt(0).toUpperCase() || "U"}
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-sm font-semibold text-center max-w-[64px] text-gray-700"
+                      numberOfLines={1}>
+                      {item.full_name || item.username || "Unknown"}
+                    </Text>
+                  </Pressable>
+                )}
+                ListEmptyComponent={
+                  <View className="flex-1 items-center justify-center py-8">
+                    <AntDesign name="user" size={50} color="#9CA3AF" />
+                    <Text className="text-gray-400 text-center">
+                      No friends yet
+                    </Text>
+                  </View>
+                }
+              />
+            </View>
+          )}
+        </View>
+
         {/* Posts Section */}
         <View className="mx-4 mt-4">
-          <View className="bg-white rounded-2xl p-4 mb-4 border border-gray-100">
-            <Text className="text-xl font-bold text-gray-900">📝 Posts</Text>
-          </View>
           <FlatList
             data={userPosts}
             renderItem={renderPost}

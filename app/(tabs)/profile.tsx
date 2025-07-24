@@ -533,17 +533,6 @@ export default function ProfileTab() {
 
       {/* Posts Section */}
       <View className="mx-4 mt-4">
-        <View className="bg-white rounded-2xl p-4 mb-4 border border-gray-100">
-          <Text className="text-xl font-bold text-gray-900">
-            <AntDesign
-              name="filetext1"
-              size={20}
-              color="#3B82F6"
-              className="mr-2"
-            />{" "}
-            My Posts
-          </Text>
-        </View>
         <FlatList
           data={posts}
           renderItem={renderPost}

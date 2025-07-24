@@ -499,7 +499,7 @@ export default function ChatRoom() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={isKeyboardVisible ? 56 : 0} // 56 = header height
+        keyboardVerticalOffset={isKeyboardVisible ? 46 : 0} // 50 = header height
       >
         <View style={{ flex: 1 }}>
           <FlatList
